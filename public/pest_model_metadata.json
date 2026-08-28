@@ -1,0 +1,55 @@
+{
+  "model_name": "DLCPD-25-Pest-MobileNetV3",
+  "num_classes": 25,
+  "classes": [
+    "Aphid",
+    "Bollworm",
+    "Brown_Planthopper",
+    "Whitefly",
+    "Fruit_Fly",
+    "Thrips",
+    "Fall_Armyworm",
+    "Stem_Borer",
+    "Leafhopper",
+    "Spider_Mite",
+    "Cutworm",
+    "Diamondback_Moth",
+    "Leaf_Miner",
+    "Grasshopper",
+    "Mealybug",
+    "Root_Grub",
+    "Pod_Borer",
+    "Gall_Midge",
+    "Gundhi_Bug",
+    "Flea_Beetle",
+    "Scale_Insect",
+    "Leaf_Folder",
+    "Weevil",
+    "Locust",
+    "Healthy_Trap_Crop"
+  ],
+  "best_val_accuracy": 98.69,
+  "best_epoch": 12,
+  "total_epochs": 15,
+  "image_size": 224,
+  "dataset": "DLCPD-25 (Dataset of Large-scale Crop Pests and Diseases 2025)",
+  "total_training_images": 6400,
+  "total_validation_images": 1600,
+  "normalization": {
+    "mean": [
+      0.485,
+      0.456,
+      0.406
+    ],
+    "std": [
+      0.229,
+      0.224,
+      0.225
+    ]
+  },
+  "input_format": "NCHW [1, 3, 224, 224]",
+  "version": "v2.5_dlcpd25_gpu_trained",
+  "device_trained_on": "NVIDIA GeForce RTX 3050 6GB Laptop GPU (CUDA AMP)",
+  "model_size_mb": 5.9,
+  "trained_at": "2026-08-27T09:11:05+05:30"
+}

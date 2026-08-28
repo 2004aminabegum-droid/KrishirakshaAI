@@ -1,0 +1,713 @@
+'use client';
+
+import React, { useState, useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation';
+import {
+  Bot,
+  Mic,
+  Send,
+  Volume2,
+  VolumeX,
+  X,
+  Sparkles,
+  Globe,
+  ExternalLink,
+  BookOpen,
+  Loader2,
+  ChevronDown,
+  Wheat,
+  Bug,
+  Wind,
+  Leaf,
+  CloudRain
+} from 'lucide-react';
+import { BHASHINI_LANGUAGES, getLanguageConfig, speakText, unlockAudio } from '../utils/bhashiniService';
+import { matchVoiceCommand } from '../utils/voiceCommandService';
+import { queryKisanVaaniRAG, RagResponse } from '../utils/ragEngine';
+import { useLanguage } from '../context/LanguageContext';
+
+interface ChatMessage {
+  id: string;
+  sender: 'user' | 'bot';
+  text: string;
+  timestamp: string;
+  topic?: string;
+  sources?: Array<{ id: string; question: string; category: string }>;
+  suggestedActions?: Array<{ label: string; action: string; path?: string }>;
+  isVoiceCommand?: boolean;
+}
+
+export const KisanMitraChatbot: React.FC = () => {
+  const router = useRouter();
+  const { language: currentAppLang } = useLanguage();
+
+  const [isOpen, setIsOpen] = useState(false);
+  const [selectedLang, setSelectedLang] = useState<string>(currentAppLang || 'hi');
+  const [inputText, setInputText] = useState('');
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [activeSpeechStop, setActiveSpeechStop] = useState<(() => void) | null>(null);
+  const [langMenuOpen, setLangMenuOpen] = useState(false);
+
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const recognitionRef = useRef<any>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const currentLangConfig = getLanguageConfig(selectedLang);
+
+  // Sync initial language with app context
+  useEffect(() => {
+    if (currentAppLang && BHASHINI_LANGUAGES.some(l => l.code === currentAppLang)) {
+      setSelectedLang(currentAppLang);
+    }
+  }, [currentAppLang]);
+
+  // Initial welcome greeting
+  useEffect(() => {
+    const welcomeMessages: Record<string, string> = {
+      hi: 'नमस्ते किसान मित्र! 🌾 मैं आपका कृषि रक्षक AI सहायक हूँ। फसल, कीट, बीमारी या खाद के बारे में पूछें, या बोलकर ऐप चलाएं।',
+      en: 'Hello Farmer! 🌾 I am your Kisan Mitra AI. Ask me about crop diseases, pests, fertilizers, or use voice commands to navigate!',
+      bn: 'নমস্কার কৃষক বন্ধু! 🌾 আমি আপনার কৃষি রক্ষক AI। ফসলের রোগ, কীট বা সার সম্পর্কে প্রশ্ন করুন।',
+      te: 'నమస్కారం రైతు మిత్రమా! 🌾 నేను మీ కృషి రక్షక్ AI. పంట వ్యాధులు, తెగుళ్లు గురించి అడగండి.',
+      ta: 'வணக்கம் விவசாய தோழரே! 🌾 நான் உங்கள் கிருஷி ரக்ஷக் AI. பயிர் நோய்கள் பற்றி கேளுங்கள்.',
+      mr: 'नमस्कार शेतकरी मित्र! 🌾 मी तुमचा कृषी रक्षक AI. पिकांचे रोग, कीड यांबद्दल विचारा.',
+    };
+    const initialText = welcomeMessages[selectedLang] || welcomeMessages.hi;
+    setMessages([{
+      id: 'msg_welcome',
+      sender: 'bot',
+      text: initialText,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      suggestedActions: [
+        { label: '📸 Crop Scanner', action: 'NAVIGATE', path: '/detect' },
+        { label: '🐛 Pest Guide', action: 'NAVIGATE', path: '/detect' },
+        { label: '🌦️ Weather Risk', action: 'NAVIGATE', path: '/forecasting' }
+      ]
+    }]);
+  }, [selectedLang]);
+
+  // Auto-scroll on new message
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages, loading]);
+
+  // Initialize Speech Recognition (ASR)
+  useEffect(() => {
+    if (typeof window !== 'undefined' && ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
+      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      const rec = new SpeechRecognition();
+      rec.continuous = false;
+      rec.interimResults = false;
+      rec.lang = currentLangConfig.speechLocale;
+
+      rec.onstart = () => setIsListening(true);
+      rec.onresult = (event: any) => {
+        const transcript = event.results[0][0].transcript;
+        if (transcript?.trim()) handleUserQuery(transcript.trim(), true);
+      };
+      rec.onerror = () => setIsListening(false);
+      rec.onend = () => setIsListening(false);
+
+      recognitionRef.current = rec;
+    }
+  }, [selectedLang, currentLangConfig]);
+
+  const toggleVoiceInput = () => {
+    unlockAudio();
+    if (!recognitionRef.current) {
+      alert('Speech Recognition not supported. Please use Chrome/Edge.');
+      return;
+    }
+    if (isListening) {
+      recognitionRef.current.stop();
+      setIsListening(false);
+    } else {
+      if (isSpeaking && activeSpeechStop) { activeSpeechStop(); setIsSpeaking(false); }
+      try {
+        recognitionRef.current.lang = currentLangConfig.speechLocale;
+        recognitionRef.current.start();
+      } catch (err) {
+        console.warn('Could not start recognition:', err);
+      }
+    }
+  };
+
+  const handleUserQuery = async (queryText: string, fromVoice: boolean = false) => {
+    if (!queryText.trim()) return;
+    unlockAudio();
+
+    const userMsg: ChatMessage = {
+      id: `msg_user_${Date.now()}`,
+      sender: 'user',
+      text: queryText,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    };
+
+    setMessages(prev => [...prev, userMsg]);
+    setInputText('');
+    setLoading(true);
+
+    // Voice navigation commands
+    const voiceCmd = matchVoiceCommand(queryText, selectedLang);
+    if (voiceCmd?.isCommand && voiceCmd.targetPath) {
+      const botCmdMsg: ChatMessage = {
+        id: `msg_bot_${Date.now()}`,
+        sender: 'bot',
+        text: `⚡ ${voiceCmd.feedbackText}`,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        isVoiceCommand: true
+      };
+      setMessages(prev => [...prev, botCmdMsg]);
+      setLoading(false);
+      const speech = speakText(voiceCmd.feedbackText, selectedLang, () => setIsSpeaking(true), () => setIsSpeaking(false));
+      setActiveSpeechStop(() => speech.stop);
+      setTimeout(() => router.push(voiceCmd.targetPath!), 900);
+      return;
+    }
+
+    // RAG Chatbot Query
+    try {
+      const ragRes: RagResponse = await queryKisanVaaniRAG(queryText, selectedLang);
+      const botMsg: ChatMessage = {
+        id: `msg_bot_${Date.now()}`,
+        sender: 'bot',
+        text: ragRes.answer,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        topic: ragRes.detectedTopic,
+        sources: ragRes.sources,
+        suggestedActions: ragRes.suggestedActions
+      };
+      setMessages(prev => [...prev, botMsg]);
+
+      if (fromVoice) {
+        const speech = speakText(ragRes.answer, selectedLang, () => setIsSpeaking(true), () => setIsSpeaking(false));
+        setActiveSpeechStop(() => speech.stop);
+      }
+    } catch {
+      setMessages(prev => [...prev, {
+        id: `msg_err_${Date.now()}`,
+        sender: 'bot',
+        text: 'Sorry, I encountered an issue. Please try again.',
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      }]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleReadAloud = (text: string) => {
+    unlockAudio();
+    if (isSpeaking && activeSpeechStop) {
+      activeSpeechStop();
+      setIsSpeaking(false);
+      return;
+    }
+    const speech = speakText(text, selectedLang, () => setIsSpeaking(true), () => setIsSpeaking(false));
+    setActiveSpeechStop(() => speech.stop);
+  };
+
+  const handleActionClick = (action: { label: string; action: string; path?: string }) => {
+    if (action.path) router.push(action.path);
+  };
+
+  const quickQuestions = [
+    { icon: <Wheat className="h-3 w-3" />, label: 'Yellow Rust', q: 'How to treat yellow rust in wheat crop?' },
+    { icon: <Bug className="h-3 w-3" />, label: 'Rice BPH', q: 'How to manage Brown Planthopper in rice?' },
+    { icon: <Leaf className="h-3 w-3" />, label: 'Neem Oil', q: 'How to prepare neem oil spray for crop pests?' },
+    { icon: <CloudRain className="h-3 w-3" />, label: 'Post-Rain Care', q: 'Protect crops from fungal diseases after heavy rainfall?' },
+    { icon: <Wind className="h-3 w-3" />, label: 'Late Blight', q: 'What is the remedy for potato late blight?' },
+  ];
+
+  return (
+    <>
+      <style>{`
+        @keyframes chatSlideUp {
+          from { opacity: 0; transform: translateY(24px) scale(0.97); }
+          to   { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        @keyframes msgFadeIn {
+          from { opacity: 0; transform: translateY(8px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes pulseRing {
+          0%   { transform: scale(1);   opacity: 0.7; }
+          70%  { transform: scale(1.8); opacity: 0; }
+          100% { transform: scale(1.8); opacity: 0; }
+        }
+        @keyframes dotBounce {
+          0%, 80%, 100% { transform: translateY(0); }
+          40%            { transform: translateY(-6px); }
+        }
+        .chat-slide-up   { animation: chatSlideUp 0.25s cubic-bezier(.16,1,.3,1) both; }
+        .msg-fade-in     { animation: msgFadeIn 0.22s ease both; }
+        .dot-bounce-1    { animation: dotBounce 1.2s infinite; }
+        .dot-bounce-2    { animation: dotBounce 1.2s 0.2s infinite; }
+        .dot-bounce-3    { animation: dotBounce 1.2s 0.4s infinite; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        .chat-scroll::-webkit-scrollbar { width: 3px; }
+        .chat-scroll::-webkit-scrollbar-track { background: transparent; }
+        .chat-scroll::-webkit-scrollbar-thumb { background: #1f2937; border-radius: 10px; }
+      `}</style>
+
+      {/* ── Floating Launcher ───────────────────────────────────────────────── */}
+      {!isOpen && (
+        <button
+          onClick={() => { setIsOpen(true); setTimeout(() => inputRef.current?.focus(), 300); }}
+          className="fixed bottom-6 right-6 z-50 group cursor-pointer"
+          aria-label="Open Kisan Mitra AI"
+        >
+          <div style={{
+            background: 'linear-gradient(135deg, #059669 0%, #10b981 50%, #34d399 100%)',
+            borderRadius: '999px',
+            padding: '14px 22px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            boxShadow: '0 8px 32px rgba(16,185,129,0.40), 0 2px 8px rgba(0,0,0,0.4)',
+            border: '1.5px solid rgba(52,211,153,0.35)',
+            transition: 'transform 0.2s, box-shadow 0.2s',
+          }}
+            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'scale(1.06)'; (e.currentTarget as HTMLElement).style.boxShadow = '0 12px 40px rgba(16,185,129,0.55), 0 2px 8px rgba(0,0,0,0.4)'; }}
+            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = 'scale(1)'; (e.currentTarget as HTMLElement).style.boxShadow = '0 8px 32px rgba(16,185,129,0.40), 0 2px 8px rgba(0,0,0,0.4)'; }}
+          >
+            {/* Pulse ring */}
+            <div className="relative">
+              <span style={{
+                position: 'absolute', inset: '-8px', borderRadius: '50%',
+                border: '2px solid rgba(52,211,153,0.6)',
+                animation: 'pulseRing 2s ease-out infinite'
+              }} />
+              <Bot style={{ width: 22, height: 22, color: '#fff' }} />
+            </div>
+            <span style={{ color: '#fff', fontWeight: 800, fontSize: 13, letterSpacing: '0.01em', whiteSpace: 'nowrap' }}>
+              Kisan Mitra AI 🌾
+            </span>
+          </div>
+        </button>
+      )}
+
+      {/* ── Chatbot Panel ────────────────────────────────────────────────────── */}
+      {isOpen && (
+        <div
+          className="chat-slide-up fixed bottom-4 right-4 z-50 flex flex-col overflow-hidden"
+          style={{
+            width: 'min(440px, 96vw)',
+            height: 'min(680px, 90vh)',
+            background: 'linear-gradient(160deg, #0a0f1e 0%, #0d1525 60%, #0a1a12 100%)',
+            border: '1px solid rgba(52,211,153,0.18)',
+            borderRadius: '20px',
+            boxShadow: '0 32px 64px rgba(0,0,0,0.7), 0 0 0 1px rgba(52,211,153,0.08), inset 0 1px 0 rgba(255,255,255,0.05)',
+          }}
+        >
+          {/* Top glow line */}
+          <div style={{
+            height: 2,
+            background: 'linear-gradient(90deg, transparent, #10b981 40%, #34d399 60%, transparent)',
+            borderRadius: '20px 20px 0 0',
+            flexShrink: 0,
+          }} />
+
+          {/* ── Header ─────────────────────────────────────────────────────── */}
+          <div style={{
+            padding: '12px 16px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            background: 'rgba(16,185,129,0.06)',
+            borderBottom: '1px solid rgba(52,211,153,0.10)',
+            flexShrink: 0,
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              {/* Avatar */}
+              <div style={{
+                width: 38, height: 38, borderRadius: 12,
+                background: 'linear-gradient(135deg, #065f46 0%, #059669 100%)',
+                border: '1.5px solid rgba(52,211,153,0.35)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                boxShadow: '0 4px 12px rgba(16,185,129,0.3)',
+                flexShrink: 0,
+              }}>
+                <Sparkles style={{ width: 18, height: 18, color: '#6ee7b7' }} />
+              </div>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ color: '#fff', fontWeight: 800, fontSize: 14 }}>Kisan Mitra AI</span>
+                  <span style={{
+                    fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 6,
+                    background: 'rgba(16,185,129,0.15)', border: '1px solid rgba(52,211,153,0.3)',
+                    color: '#6ee7b7', letterSpacing: '0.04em'
+                  }}>BHASHINI</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 1 }}>
+                  <span style={{
+                    width: 6, height: 6, borderRadius: '50%',
+                    background: '#10b981',
+                    boxShadow: '0 0 6px #10b981',
+                    animation: 'pulseRing 2s ease-out infinite',
+                    display: 'inline-block',
+                  }} />
+                  <span style={{ color: '#6b7280', fontSize: 10 }}>KisanVaani · RAG · Voice</span>
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              {/* Language Picker */}
+              <div style={{ position: 'relative' }}>
+                <button
+                  onClick={() => setLangMenuOpen(v => !v)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 5,
+                    background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
+                    borderRadius: 10, padding: '5px 10px',
+                    color: '#d1fae5', fontSize: 11, fontWeight: 700, cursor: 'pointer',
+                    transition: 'background 0.2s',
+                  }}
+                >
+                  <Globe style={{ width: 12, height: 12 }} />
+                  {currentLangConfig.nativeName}
+                  <ChevronDown style={{ width: 10, height: 10, opacity: 0.6 }} />
+                </button>
+
+                {langMenuOpen && (
+                  <div style={{
+                    position: 'absolute', top: 34, right: 0, zIndex: 10,
+                    background: '#0f172a', border: '1px solid rgba(52,211,153,0.2)',
+                    borderRadius: 12, overflow: 'hidden',
+                    boxShadow: '0 16px 40px rgba(0,0,0,0.6)',
+                    minWidth: 170,
+                    animation: 'msgFadeIn 0.15s ease both',
+                  }}>
+                    {BHASHINI_LANGUAGES.map(lang => (
+                      <button
+                        key={lang.code}
+                        onClick={() => { setSelectedLang(lang.code); setLangMenuOpen(false); }}
+                        style={{
+                          width: '100%', textAlign: 'left', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                          padding: '8px 14px', fontSize: 12, fontWeight: lang.code === selectedLang ? 700 : 500,
+                          color: lang.code === selectedLang ? '#6ee7b7' : '#94a3b8',
+                          background: lang.code === selectedLang ? 'rgba(16,185,129,0.1)' : 'transparent',
+                          cursor: 'pointer', border: 'none',
+                          transition: 'background 0.15s',
+                        }}
+                        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(16,185,129,0.08)'; }}
+                        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = lang.code === selectedLang ? 'rgba(16,185,129,0.1)' : 'transparent'; }}
+                      >
+                        <span>{lang.nativeName}</span>
+                        <span style={{ fontSize: 10, color: '#4b5563' }}>{lang.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Close */}
+              <button
+                onClick={() => { setIsOpen(false); if (isSpeaking && activeSpeechStop) activeSpeechStop(); setLangMenuOpen(false); }}
+                style={{
+                  width: 30, height: 30, borderRadius: 8, cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)',
+                  color: '#6b7280', transition: 'all 0.2s',
+                }}
+                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(239,68,68,0.15)'; (e.currentTarget as HTMLElement).style.color = '#f87171'; (e.currentTarget as HTMLElement).style.borderColor = 'rgba(239,68,68,0.3)'; }}
+                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.05)'; (e.currentTarget as HTMLElement).style.color = '#6b7280'; (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.08)'; }}
+              >
+                <X style={{ width: 15, height: 15 }} />
+              </button>
+            </div>
+          </div>
+
+          {/* ── Message List ────────────────────────────────────────────────── */}
+          <div className="chat-scroll" style={{ flex: 1, overflowY: 'auto', padding: '14px 14px 8px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {messages.map((msg) => (
+              <div
+                key={msg.id}
+                className="msg-fade-in"
+                style={{ display: 'flex', gap: 8, justifyContent: msg.sender === 'user' ? 'flex-end' : 'flex-start', alignItems: 'flex-end' }}
+              >
+                {/* Bot Avatar */}
+                {msg.sender === 'bot' && (
+                  <div style={{
+                    width: 28, height: 28, borderRadius: 9, flexShrink: 0,
+                    background: msg.isVoiceCommand
+                      ? 'linear-gradient(135deg, #7c3aed, #a855f7)'
+                      : 'linear-gradient(135deg, #065f46, #059669)',
+                    border: '1px solid rgba(52,211,153,0.25)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    marginBottom: 2,
+                  }}>
+                    <Sparkles style={{ width: 13, height: 13, color: '#a7f3d0' }} />
+                  </div>
+                )}
+
+                {/* Bubble */}
+                <div style={{
+                  maxWidth: '82%',
+                  borderRadius: msg.sender === 'user' ? '18px 18px 4px 18px' : '18px 18px 18px 4px',
+                  padding: '10px 14px',
+                  fontSize: 12.5,
+                  lineHeight: 1.6,
+                  ...(msg.sender === 'user'
+                    ? {
+                      background: 'linear-gradient(135deg, #059669 0%, #10b981 100%)',
+                      color: '#fff',
+                      boxShadow: '0 4px 16px rgba(16,185,129,0.25)',
+                    }
+                    : {
+                      background: 'rgba(255,255,255,0.04)',
+                      border: '1px solid rgba(255,255,255,0.08)',
+                      color: '#e2e8f0',
+                      backdropFilter: 'blur(8px)',
+                      boxShadow: '0 4px 16px rgba(0,0,0,0.2)',
+                    })
+                }}>
+                  {/* Topic badge */}
+                  {msg.topic && msg.sender === 'bot' && (
+                    <span style={{
+                      display: 'inline-block', marginBottom: 6,
+                      fontSize: 9, fontWeight: 700, padding: '2px 7px', borderRadius: 5,
+                      background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(52,211,153,0.2)',
+                      color: '#6ee7b7', letterSpacing: '0.06em', textTransform: 'uppercase'
+                    }}>
+                      {msg.topic}
+                    </span>
+                  )}
+
+                  <p style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{msg.text}</p>
+
+                  {/* Sources */}
+                  {msg.sources && msg.sources.length > 0 && (
+                    <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid rgba(255,255,255,0.07)' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 4, color: '#34d399', fontSize: 10, fontWeight: 700 }}>
+                        <BookOpen style={{ width: 10, height: 10 }} />
+                        KisanVaani Source
+                      </div>
+                      {msg.sources.slice(0, 2).map((s, i) => (
+                        <div key={i} style={{ fontSize: 9.5, color: '#475569', marginBottom: 2 }}>
+                          <span style={{ color: '#6b7280', fontFamily: 'monospace' }}>[{s.id}]</span>{' '}
+                          <span style={{ color: '#64748b' }}>{s.question}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Action chips */}
+                  {msg.suggestedActions && msg.suggestedActions.length > 0 && (
+                    <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                      {msg.suggestedActions.map((act, i) => (
+                        <button
+                          key={i}
+                          onClick={() => handleActionClick(act)}
+                          style={{
+                            padding: '4px 10px', borderRadius: 6, cursor: 'pointer',
+                            fontSize: 10, fontWeight: 700,
+                            background: 'rgba(16,185,129,0.10)',
+                            border: '1px solid rgba(52,211,153,0.25)',
+                            color: '#6ee7b7', display: 'flex', alignItems: 'center', gap: 3,
+                            transition: 'all 0.2s',
+                          }}
+                          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(16,185,129,0.2)'; (e.currentTarget as HTMLElement).style.borderColor = 'rgba(52,211,153,0.5)'; }}
+                          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(16,185,129,0.10)'; (e.currentTarget as HTMLElement).style.borderColor = 'rgba(52,211,153,0.25)'; }}
+                        >
+                          {act.label} <ExternalLink style={{ width: 8, height: 8, opacity: 0.6 }} />
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Footer: time + read aloud */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 6, opacity: 0.55 }}>
+                    <span style={{ fontSize: 9.5 }}>{msg.timestamp}</span>
+                    {msg.sender === 'bot' && (
+                      <button
+                        onClick={() => handleReadAloud(msg.text)}
+                        style={{
+                          cursor: 'pointer', background: 'none', border: 'none',
+                          color: isSpeaking ? '#fbbf24' : 'inherit',
+                          padding: 2, display: 'flex', alignItems: 'center',
+                          transition: 'color 0.2s',
+                        }}
+                        title="Read aloud"
+                      >
+                        {isSpeaking
+                          ? <VolumeX style={{ width: 13, height: 13 }} />
+                          : <Volume2 style={{ width: 13, height: 13 }} />
+                        }
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* User Avatar */}
+                {msg.sender === 'user' && (
+                  <div style={{
+                    width: 28, height: 28, borderRadius: 9, flexShrink: 0,
+                    background: 'linear-gradient(135deg, #1e3a5f, #2563eb)',
+                    border: '1px solid rgba(96,165,250,0.25)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    marginBottom: 2, fontSize: 12, color: '#93c5fd', fontWeight: 800,
+                  }}>
+                    👤
+                  </div>
+                )}
+              </div>
+            ))}
+
+            {/* Typing Indicator */}
+            {loading && (
+              <div className="msg-fade-in" style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
+                <div style={{
+                  width: 28, height: 28, borderRadius: 9, flexShrink: 0,
+                  background: 'linear-gradient(135deg, #065f46, #059669)',
+                  border: '1px solid rgba(52,211,153,0.25)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  <Loader2 style={{ width: 13, height: 13, color: '#a7f3d0', animation: 'spin 1s linear infinite' }} />
+                </div>
+                <div style={{
+                  background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
+                  borderRadius: '18px 18px 18px 4px', padding: '12px 16px',
+                  display: 'flex', alignItems: 'center', gap: 4,
+                }}>
+                  <span className="dot-bounce-1" style={{ width: 6, height: 6, borderRadius: '50%', background: '#34d399', display: 'inline-block' }} />
+                  <span className="dot-bounce-2" style={{ width: 6, height: 6, borderRadius: '50%', background: '#34d399', display: 'inline-block' }} />
+                  <span className="dot-bounce-3" style={{ width: 6, height: 6, borderRadius: '50%', background: '#34d399', display: 'inline-block' }} />
+                </div>
+              </div>
+            )}
+            <div ref={messagesEndRef} />
+          </div>
+
+          {/* ── Quick Topic Chips ───────────────────────────────────────────── */}
+          <div className="no-scrollbar" style={{
+            overflowX: 'auto', display: 'flex', gap: 6, padding: '8px 14px',
+            borderTop: '1px solid rgba(255,255,255,0.05)',
+            background: 'rgba(0,0,0,0.2)', flexShrink: 0,
+          }}>
+            {quickQuestions.map((q, i) => (
+              <button
+                key={i}
+                onClick={() => handleUserQuery(q.q)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 5,
+                  padding: '5px 11px', borderRadius: 999, whiteSpace: 'nowrap', cursor: 'pointer',
+                  background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.09)',
+                  color: '#94a3b8', fontSize: 11, fontWeight: 600,
+                  transition: 'all 0.2s', flexShrink: 0,
+                }}
+                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(16,185,129,0.1)'; (e.currentTarget as HTMLElement).style.color = '#6ee7b7'; (e.currentTarget as HTMLElement).style.borderColor = 'rgba(52,211,153,0.25)'; }}
+                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.04)'; (e.currentTarget as HTMLElement).style.color = '#94a3b8'; (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.09)'; }}
+              >
+                {q.icon}
+                {q.label}
+              </button>
+            ))}
+          </div>
+
+          {/* ── Listening Banner ────────────────────────────────────────────── */}
+          {isListening && (
+            <div style={{
+              padding: '8px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              background: 'rgba(245,158,11,0.08)', borderTop: '1px solid rgba(245,158,11,0.2)',
+              flexShrink: 0,
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                {/* Audio wave bars */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                  {[0, 0.1, 0.2, 0.1, 0].map((delay, i) => (
+                    <div key={i} style={{
+                      width: 3, height: 14, borderRadius: 2, background: '#f59e0b',
+                      animation: `dotBounce 0.8s ${delay}s ease-in-out infinite`,
+                    }} />
+                  ))}
+                </div>
+                <span style={{ color: '#fbbf24', fontSize: 11, fontWeight: 700 }}>
+                  Listening in {currentLangConfig.name}...
+                </span>
+              </div>
+              <button
+                onClick={toggleVoiceInput}
+                style={{ color: '#f59e0b', fontSize: 11, fontWeight: 700, cursor: 'pointer', background: 'none', border: 'none', textDecoration: 'underline' }}
+              >
+                Stop
+              </button>
+            </div>
+          )}
+
+          {/* ── Input Bar ───────────────────────────────────────────────────── */}
+          <form
+            onSubmit={e => { e.preventDefault(); handleUserQuery(inputText); }}
+            style={{
+              padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 8,
+              background: 'rgba(0,0,0,0.3)', borderTop: '1px solid rgba(255,255,255,0.06)',
+              flexShrink: 0,
+            }}
+          >
+            {/* Mic */}
+            <button
+              type="button"
+              onClick={toggleVoiceInput}
+              style={{
+                width: 38, height: 38, borderRadius: 11, border: 'none', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                transition: 'all 0.2s',
+                ...(isListening
+                  ? { background: 'linear-gradient(135deg, #d97706, #f59e0b)', boxShadow: '0 0 16px rgba(245,158,11,0.5)', animation: 'pulseRing 1.5s ease-out infinite' }
+                  : { background: 'rgba(255,255,255,0.06)', color: '#6b7280' }
+                )
+              }}
+              title="Voice input"
+            >
+              <Mic style={{ width: 16, height: 16, color: isListening ? '#fff' : '#9ca3af' }} />
+            </button>
+
+            {/* Input */}
+            <input
+              ref={inputRef}
+              type="text"
+              value={inputText}
+              onChange={e => setInputText(e.target.value)}
+              placeholder={
+                selectedLang === 'hi' ? 'प्रश्न पूछें या आवाज़ में बोलें...' :
+                selectedLang === 'bn' ? 'প্রশ্ন জিজ্ঞেস করুন বা বলুন...' :
+                selectedLang === 'te' ? 'ప్రశ్న అడగండి లేదా మాట్లాడండి...' :
+                selectedLang === 'ta' ? 'கேள்வி கேளுங்கள் அல்லது பேசுங்கள்...' :
+                selectedLang === 'mr' ? 'प्रश्न विचारा किंवा बोला...' :
+                `Ask in ${currentLangConfig.nativeName}...`
+              }
+              style={{
+                flex: 1, borderRadius: 11, background: 'rgba(255,255,255,0.05)',
+                border: '1px solid rgba(255,255,255,0.1)',
+                padding: '9px 14px', fontSize: 12.5, color: '#e2e8f0',
+                outline: 'none', transition: 'border 0.2s',
+              }}
+              onFocus={e => { e.currentTarget.style.borderColor = 'rgba(52,211,153,0.45)'; e.currentTarget.style.background = 'rgba(255,255,255,0.07)'; }}
+              onBlur={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)'; e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; }}
+            />
+
+            {/* Send */}
+            <button
+              type="submit"
+              disabled={!inputText.trim() || loading}
+              style={{
+                width: 38, height: 38, borderRadius: 11, border: 'none', cursor: inputText.trim() && !loading ? 'pointer' : 'not-allowed',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                transition: 'all 0.2s',
+                background: inputText.trim() && !loading
+                  ? 'linear-gradient(135deg, #059669 0%, #10b981 100%)'
+                  : 'rgba(255,255,255,0.05)',
+                boxShadow: inputText.trim() && !loading ? '0 4px 14px rgba(16,185,129,0.35)' : 'none',
+              }}
+            >
+              <Send style={{ width: 15, height: 15, color: inputText.trim() && !loading ? '#fff' : '#374151' }} />
+            </button>
+          </form>
+        </div>
+      )}
+    </>
+  );
+};

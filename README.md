@@ -1,5 +1,12 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## Supabase setup
+
+1. Create a Supabase project and add `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` to `.env.local`.
+2. Run [`supabase-schema.sql`](supabase-schema.sql) in the Supabase SQL Editor. Existing `validation_requests` tables receive the `farmer_id` column automatically.
+3. In Supabase Authentication, create `admin@gmail.com` with password `admin`, then run the admin profile statement at the bottom of the SQL file. This account opens the agriculture officer portal.
+4. Farmers and officers can create accounts from `/login`. Farmer fields are private to their owner; officers can read the complete field registry and validation queue through RLS.
+
 ## Getting Started
 
 First, run the development server:
