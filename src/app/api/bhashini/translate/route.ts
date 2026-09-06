@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+export const dynamic = 'force-static';
+
+export async function GET() {
+  return NextResponse.json({ service: 'bhashini_translate', status: 'ready' });
+}
+
 /**
  * Translates a single chunk of text using Bhashini ULCA or Neural NMT
  */

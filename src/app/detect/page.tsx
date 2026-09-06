@@ -27,6 +27,7 @@ import { NetworkBadge } from '../../components/NetworkBadge';
 import { PestBoundingBox } from '../../components/PestBoundingBox';
 import { analyzeCropHybrid, HybridResult } from '../../utils/hybridEngine';
 import { addNotification } from '../../utils/notifications';
+import { takeNativePhoto, isNativePlatform } from '../../utils/nativeBridge';
 
 // ─── Disease Handbook Database (19 Classes) ─────────────────────────────────
 const DISEASE_DB: Record<string, { symptoms: string; remedy: string }> = {
@@ -208,6 +209,14 @@ export default function DetectPage() {
     const reader = new FileReader();
     reader.onloadend = () => setImageFile(reader.result as string);
     reader.readAsDataURL(file);
+  };
+
+  const handleNativeCamera = async () => {
+    const photo = await takeNativePhoto('camera');
+    if (photo) {
+      setImageName(photo.name);
+      setImageFile(photo.dataUrl);
+    }
   };
 
   const handleIotCapture = () => {
@@ -441,9 +450,20 @@ export default function DetectPage() {
 
               {/* Upload Drop Zone / IoT Camera */}
               {analysisMode !== 'environmental' && (analysisMode === 'disease' || sourceMode === 'manual') ? (
-                <div className="relative border-2 border-dashed border-slate-800 hover:border-green-600/40 rounded-xl p-8 text-center bg-slate-950/40 cursor-pointer group transition-all">
-                  <input type="file" accept="image/*" capture="environment" onChange={handleFileChange}
-                    className="absolute inset-0 opacity-0 cursor-pointer" />
+                <div className="space-y-3">
+                  {isNativePlatform() && (
+                    <button
+                      type="button"
+                      onClick={handleNativeCamera}
+                      className="w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-2 shadow-md shadow-emerald-600/20 transition-all cursor-pointer"
+                    >
+                      <Camera className="w-4 h-4" />
+                      Take Photo with Android Camera
+                    </button>
+                  )}
+                  <div className="relative border-2 border-dashed border-slate-800 hover:border-green-600/40 rounded-xl p-8 text-center bg-slate-950/40 cursor-pointer group transition-all">
+                    <input type="file" accept="image/*" capture="environment" onChange={handleFileChange}
+                      className="absolute inset-0 opacity-0 cursor-pointer" />
                   {imageFile ? (
                     <div className="space-y-3">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -458,6 +478,7 @@ export default function DetectPage() {
                       <p className="text-[10px] text-slate-500">{t('supportedFormats')}</p>
                     </div>
                   )}
+                  </div>
                 </div>
               ) : analysisMode !== 'environmental' && (
                 <div className="border border-slate-800 bg-slate-950/40 rounded-xl p-8 text-center space-y-4">

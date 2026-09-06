@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { queryKisanVaaniRAG } from '../../../utils/ragEngine';
 
+export const dynamic = 'force-static';
+
+export async function GET() {
+  return NextResponse.json({ service: 'kisanvaani_chat_rag', status: 'ready' });
+}
+
 export async function POST(req: NextRequest) {
   try {
     const { query, language = 'en', role = 'farmer' } = await req.json();
