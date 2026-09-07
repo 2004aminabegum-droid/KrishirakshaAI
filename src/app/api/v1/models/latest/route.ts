@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { DLCPD25_PEST_TAXONOMY, PestTaxonomyItem } from '../../../../../utils/imageClassifier';
 
+export const dynamic = 'force-static';
+
 export async function GET() {
   return NextResponse.json({
     offline_model: {

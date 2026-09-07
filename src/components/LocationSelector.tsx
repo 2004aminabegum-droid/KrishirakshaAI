@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { PRESET_LOCATIONS, LocationPreset } from '../utils/weatherService';
 import { MapPin, Navigation, Check, RefreshCw, Globe, ChevronDown } from 'lucide-react';
+import { getNativeLocation } from '../utils/nativeBridge';
 
 interface LocationSelectorProps {
   currentLocationName: string;
@@ -19,31 +20,23 @@ export const LocationSelector: React.FC<LocationSelectorProps> = ({
   const [detectingGeo, setDetectingGeo] = useState(false);
   const [customSearch, setCustomSearch] = useState('');
 
-  // Handle GPS Auto Detection
-  const handleAutoDetect = () => {
-    if (!navigator.geolocation) {
-      alert('Geolocation is not supported by your browser.');
-      return;
-    }
-
+  // Handle GPS Auto Detection (supports Native Android GPS + Web Geolocation)
+  const handleAutoDetect = async () => {
     setDetectingGeo(true);
-    navigator.geolocation.getCurrentPosition(
-      position => {
-        const lat = Math.round(position.coords.latitude * 100) / 100;
-        const lon = Math.round(position.coords.longitude * 100) / 100;
-        const name = `GPS Detected (${lat}°N, ${lon}°E)`;
-        
-        onSelectLocation({ name, lat, lon, isGeo: true });
-        setDetectingGeo(false);
-        setIsOpen(false);
-      },
-      error => {
-        console.warn('Geolocation error:', error);
-        alert('Could not retrieve device location. Please select your region manually.');
-        setDetectingGeo(false);
-      },
-      { timeout: 10000, enableHighAccuracy: true }
-    );
+    try {
+      const coords = await getNativeLocation();
+      const lat = Math.round(coords.latitude * 100) / 100;
+      const lon = Math.round(coords.longitude * 100) / 100;
+      const name = `GPS Detected (${lat}°N, ${lon}°E)`;
+
+      onSelectLocation({ name, lat, lon, isGeo: true });
+      setIsOpen(false);
+    } catch (error) {
+      console.warn('Geolocation error:', error);
+      alert('Could not retrieve device location. Please check GPS permissions or select your region manually.');
+    } finally {
+      setDetectingGeo(false);
+    }
   };
 
   const handleSelectPreset = (preset: LocationPreset) => {

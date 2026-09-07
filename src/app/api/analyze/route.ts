@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDiseaseDetails, getPestDetails, PEST_TAXONOMY_KB } from '../../../utils/datasetMapper';
 
+export const dynamic = 'force-static';
+
+export async function GET() {
+  return NextResponse.json({ service: 'hybrid_crop_analyze', status: 'ready' });
+}
+
 export async function POST(req: NextRequest) {
   try {
     const formData = await req.formData();

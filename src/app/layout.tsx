@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import PWARegister from "./PWARegister";
+import { CapacitorInit } from "../components/CapacitorInit";
 import { LanguageProvider } from "../context/LanguageContext";
 import { OfflineProvider } from "../context/OfflineContext";
 import { AuthProvider } from "../context/AuthContext";
@@ -43,6 +44,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <AuthGate>
               <OfflineProvider>
                 <PWARegister />
+                <CapacitorInit />
                 {children}
                 <KisanMitraChatbot />
               </OfflineProvider>
