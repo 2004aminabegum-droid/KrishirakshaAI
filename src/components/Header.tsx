@@ -99,8 +99,8 @@ export const Header: React.FC<HeaderProps> = ({ role }) => {
           
           {/* Logo */}
           <div className="flex min-w-[170px] shrink-0 cursor-pointer items-center gap-2" onClick={() => router.push('/')}>
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-green-600 shadow-lg shadow-green-500/20">
-              <Leaf className="h-5 w-5 text-white" />
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/95 p-0.5 shadow-lg shadow-green-500/20 ring-1 ring-white/20">
+              <img src="/logo-shield.png" alt="KrishiRakshak AI Logo" className="h-7 w-7 object-contain" />
             </div>
             <div className="min-w-0">
               <h1 className="flex items-center gap-1.5 whitespace-nowrap text-[17px] font-bold leading-tight tracking-tight text-white">

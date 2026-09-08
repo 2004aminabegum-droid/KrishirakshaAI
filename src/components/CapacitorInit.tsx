@@ -32,7 +32,8 @@ export function CapacitorInit() {
       try {
         const { App: CapApp } = await import('@capacitor/app');
         const listener = await CapApp.addListener('backButton', ({ canGoBack }) => {
-          if (pathname === '/' || pathname === '/dashboard' || !canGoBack) {
+          const cleanPath = (pathname || '/').replace(/\/index\.html$/, '').replace(/\/+$/, '') || '/';
+          if (cleanPath === '/' || cleanPath === '/login' || !canGoBack) {
             CapApp.minimizeApp();
           } else {
             router.back();
