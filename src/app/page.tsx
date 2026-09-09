@@ -259,8 +259,8 @@ export default function Home() {
           
           {/* Logo & Brand */}
           <div className="flex items-center gap-3 cursor-pointer" onClick={() => router.push('/')}>
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-green-500 to-emerald-700 shadow-lg shadow-green-500/25 ring-1 ring-white/20">
-              <Leaf className="h-6 w-6 text-white" />
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/95 p-1 shadow-lg shadow-green-500/25 ring-1 ring-white/20">
+              <img src="/logo-shield.png" alt="KrishiRakshak AI" className="h-9 w-9 object-contain" />
             </div>
             <div>
               <h1 className="text-xl font-black text-white tracking-tight flex items-center gap-2">
@@ -830,7 +830,7 @@ export default function Home() {
       <footer className="w-full py-10 border-t border-slate-900 z-10 bg-slate-950/80">
         <div className="max-w-7xl mx-auto px-4 text-center space-y-4">
           <div className="flex items-center justify-center gap-2">
-            <Leaf className="h-5 w-5 text-green-500" />
+            <img src="/logo-shield.png" alt="KrishiRakshak AI" className="h-6 w-6 object-contain" />
             <span className="font-bold text-white text-sm">KrishiRakshak AI</span>
           </div>
           <p className="text-xs text-slate-500 max-w-xl mx-auto">
