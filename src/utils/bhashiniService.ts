@@ -140,7 +140,7 @@ function stopActive() {
 
 /**
  * Speak text in the chosen Indian language.
- * Uses a Blob URL approach — immune to browser autoplay restrictions.
+ * Seamlessly uses Native Android TTS when in APK, and Web Speech API in browser.
  */
 export function speakText(
   text: string,
@@ -166,63 +166,40 @@ export function speakText(
     .replace(/•/g, ', ')
     .replace(/\s+/g, ' ')
     .trim()
-    .substring(0, 250);
+    .substring(0, 300);
 
-  if (!cleanText) { if (onEnd) onEnd(); return { stop }; }
+  if (!cleanText) {
+    if (onEnd) onEnd();
+    return { stop };
+  }
 
-  // Fetch raw audio binary → convert to Blob URL → play
-  fetch('/api/bhashini/tts', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text: cleanText, lang: langCode })
-  })
-    .then(async res => {
-      if (cancelled) return;
-
-      const contentType = res.headers.get('content-type') || '';
-
-      // Raw audio stream returned
-      if (contentType.startsWith('audio/')) {
-        const arrayBuf = await res.arrayBuffer();
-        if (cancelled) return;
-
-        const blob = new Blob([arrayBuf], { type: contentType });
-        const blobUrl = URL.createObjectURL(blob);
-        activeBlobUrl = blobUrl;
-
-        const audio = new Audio(blobUrl);
-        activeAudio = audio;
-
-        audio.onplay = () => { if (onStart) onStart(); };
-        audio.onended = () => {
-          URL.revokeObjectURL(blobUrl);
-          activeBlobUrl = null;
-          activeAudio = null;
+  // 1. Android Native APK TTS (Instant, offline, crystal clear)
+  if ((window as any).AndroidNativeSpeech?.isNativeSpeechAvailable?.()) {
+    try {
+      (window as any).handleNativeSpeechStart = () => {
+        if (!cancelled && onStart) onStart();
+      };
+      (window as any).handleNativeSpeechEnd = () => {
+        if (onEnd) onEnd();
+      };
+      (window as any).AndroidNativeSpeech.speak(cleanText, langCode);
+      if (onStart) onStart();
+      return {
+        stop: () => {
+          cancelled = true;
+          try {
+            (window as any).AndroidNativeSpeech.stopSpeaking();
+          } catch {}
           if (onEnd) onEnd();
-        };
-        audio.onerror = (e) => {
-          console.warn('[Chatbot TTS] Audio play error, falling back', e);
-          URL.revokeObjectURL(blobUrl);
-          activeBlobUrl = null;
-          activeAudio = null;
-          if (!cancelled) webSpeechFallback(cleanText, langCode, onStart, onEnd);
-        };
+        }
+      };
+    } catch (e) {
+      console.warn('[Chatbot TTS] Native Android TTS failed, falling back to Web Speech:', e);
+    }
+  }
 
-        audio.play().catch(e => {
-          console.warn('[Chatbot TTS] audio.play() blocked', e);
-          if (!cancelled) webSpeechFallback(cleanText, langCode, onStart, onEnd);
-        });
-
-      } else {
-        // JSON fallback instruction
-        if (!cancelled) webSpeechFallback(cleanText, langCode, onStart, onEnd);
-      }
-    })
-    .catch(err => {
-      console.warn('[Chatbot TTS] fetch error', err);
-      if (!cancelled) webSpeechFallback(cleanText, langCode, onStart, onEnd);
-    });
-
+  // 2. Web Speech API (Browser)
+  webSpeechFallback(cleanText, langCode, onStart, onEnd);
   return { stop };
 }
 
@@ -233,33 +210,96 @@ function webSpeechFallback(
   onEnd?: () => void
 ) {
   if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
-    if (onEnd) onEnd();
+    // 3. Direct Google TTS audio stream fallback
+    playGoogleTtsAudio(text, langCode, onStart, onEnd);
     return;
   }
 
-  const config = getLanguageConfig(langCode);
-  const voices = window.speechSynthesis.getVoices();
+  try {
+    window.speechSynthesis.cancel();
+    if (window.speechSynthesis.paused) {
+      window.speechSynthesis.resume();
+    }
 
-  const targetVoice = voices.find(v =>
-    v.lang === config.speechLocale ||
-    v.lang.replace('_', '-').startsWith(config.speechLocale) ||
-    v.lang.startsWith(config.code + '-') ||
-    v.lang === config.code
-  );
+    const config = getLanguageConfig(langCode);
+    const utt = new SpeechSynthesisUtterance(text);
+    utt.lang = config.speechLocale;
+    utt.rate = 0.95;
+    utt.pitch = 1.0;
 
-  // If non-English and no native voice installed, skip rather than mispronounce
-  if (langCode !== 'en' && !targetVoice) {
-    console.warn(`[TTS] No native voice for "${langCode}". Skipping.`);
-    if (onEnd) onEnd();
-    return;
+    const voices = window.speechSynthesis.getVoices();
+    if (voices && voices.length > 0) {
+      const match = voices.find(v =>
+        v.lang === config.speechLocale ||
+        v.lang.replace('_', '-').toLowerCase().startsWith(config.speechLocale.toLowerCase()) ||
+        v.lang.toLowerCase().startsWith(config.code.toLowerCase())
+      );
+      if (match) {
+        utt.voice = match;
+      }
+    }
+
+    let started = false;
+    utt.onstart = () => {
+      started = true;
+      if (onStart) onStart();
+    };
+
+    utt.onend = () => {
+      if (onEnd) onEnd();
+    };
+
+    utt.onerror = (e) => {
+      console.warn('[WebSpeech error]:', e);
+      if (!started) {
+        playGoogleTtsAudio(text, langCode, onStart, onEnd);
+      } else {
+        if (onEnd) onEnd();
+      }
+    };
+
+    window.speechSynthesis.speak(utt);
+
+    // Chrome bug workaround: speech sometimes doesn't fire onstart if queue was idle
+    setTimeout(() => {
+      if (window.speechSynthesis.speaking && window.speechSynthesis.paused) {
+        window.speechSynthesis.resume();
+      }
+    }, 100);
+  } catch (err) {
+    console.warn('[WebSpeech exception]:', err);
+    playGoogleTtsAudio(text, langCode, onStart, onEnd);
   }
+}
 
-  const utt = new SpeechSynthesisUtterance(text);
-  utt.lang = config.speechLocale;
-  utt.rate = 0.93;
-  if (targetVoice) utt.voice = targetVoice;
-  if (onStart) utt.onstart = onStart;
-  if (onEnd) { utt.onend = onEnd; utt.onerror = () => onEnd(); }
+function playGoogleTtsAudio(
+  text: string,
+  langCode: string,
+  onStart?: () => void,
+  onEnd?: () => void
+) {
+  try {
+    const googleTtsUrl = `https://translate.google.com/translate_tts?ie=UTF-8&tl=${encodeURIComponent(langCode)}&client=tw-ob&q=${encodeURIComponent(text.substring(0, 160))}`;
+    const audio = new Audio(googleTtsUrl);
+    activeAudio = audio;
 
-  window.speechSynthesis.speak(utt);
+    audio.onplay = () => {
+      if (onStart) onStart();
+    };
+    audio.onended = () => {
+      activeAudio = null;
+      if (onEnd) onEnd();
+    };
+    audio.onerror = () => {
+      activeAudio = null;
+      if (onEnd) onEnd();
+    };
+
+    audio.play().catch(() => {
+      activeAudio = null;
+      if (onEnd) onEnd();
+    });
+  } catch {
+    if (onEnd) onEnd();
+  }
 }

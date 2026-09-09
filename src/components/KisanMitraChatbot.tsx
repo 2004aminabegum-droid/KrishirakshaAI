@@ -51,6 +51,8 @@ export const KisanMitraChatbot: React.FC = () => {
   const [activeSpeechStop, setActiveSpeechStop] = useState<(() => void) | null>(null);
   const [langMenuOpen, setLangMenuOpen] = useState(false);
 
+  const [speakingMsgId, setSpeakingMsgId] = useState<string | null>(null);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -63,6 +65,28 @@ export const KisanMitraChatbot: React.FC = () => {
       setSelectedLang(currentAppLang);
     }
   }, [currentAppLang]);
+
+  // Set up listeners for native Android speech bridge
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      (window as any).handleNativeSpeechResult = (text: string) => {
+        setIsListening(false);
+        if (text && text.trim()) {
+          handleUserQuery(text.trim(), true);
+        }
+      };
+      (window as any).handleNativeSpeechError = (errMsg: string) => {
+        setIsListening(false);
+        console.warn('[Native Speech Error]:', errMsg);
+      };
+      (window as any).handleNativeSpeechEnd = () => {
+        setIsListening(false);
+      };
+      (window as any).handleNativeSpeechStart = () => {
+        setIsSpeaking(true);
+      };
+    }
+  }, []);
 
   // Initial welcome greeting
   useEffect(() => {
@@ -93,43 +117,69 @@ export const KisanMitraChatbot: React.FC = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, loading]);
 
-  // Initialize Speech Recognition (ASR)
-  useEffect(() => {
-    if (typeof window !== 'undefined' && ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
-      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-      const rec = new SpeechRecognition();
-      rec.continuous = false;
-      rec.interimResults = false;
-      rec.lang = currentLangConfig.speechLocale;
-
-      rec.onstart = () => setIsListening(true);
-      rec.onresult = (event: any) => {
-        const transcript = event.results[0][0].transcript;
-        if (transcript?.trim()) handleUserQuery(transcript.trim(), true);
-      };
-      rec.onerror = () => setIsListening(false);
-      rec.onend = () => setIsListening(false);
-
-      recognitionRef.current = rec;
-    }
-  }, [selectedLang, currentLangConfig]);
-
   const toggleVoiceInput = () => {
     unlockAudio();
-    if (!recognitionRef.current) {
-      alert('Speech Recognition not supported. Please use Chrome/Edge.');
+
+    if (isSpeaking && activeSpeechStop) {
+      activeSpeechStop();
+      setIsSpeaking(false);
+      setSpeakingMsgId(null);
+    }
+
+    // 1. Android Native APK speech recognition
+    if (typeof window !== 'undefined' && (window as any).AndroidNativeSpeech?.isNativeSpeechAvailable?.()) {
+      if (isListening) {
+        setIsListening(false);
+      } else {
+        setIsListening(true);
+        try {
+          (window as any).AndroidNativeSpeech.startRecognition(currentLangConfig.speechLocale);
+        } catch (err) {
+          console.warn('[Native Speech Recognition start failed]:', err);
+          setIsListening(false);
+        }
+      }
       return;
     }
+
+    // 2. Web Speech API (Browser)
+    const SpeechRec = typeof window !== 'undefined' && ((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition);
+    if (!SpeechRec) {
+      alert('Speech Recognition is not supported in this browser. Please use Google Chrome, Edge, or our Android App.');
+      return;
+    }
+
     if (isListening) {
-      recognitionRef.current.stop();
+      if (recognitionRef.current) {
+        try { recognitionRef.current.stop(); } catch {}
+      }
       setIsListening(false);
     } else {
-      if (isSpeaking && activeSpeechStop) { activeSpeechStop(); setIsSpeaking(false); }
       try {
-        recognitionRef.current.lang = currentLangConfig.speechLocale;
-        recognitionRef.current.start();
+        const rec = new SpeechRec();
+        rec.continuous = false;
+        rec.interimResults = false;
+        rec.lang = currentLangConfig.speechLocale;
+
+        rec.onstart = () => setIsListening(true);
+        rec.onresult = (event: any) => {
+          setIsListening(false);
+          const transcript = event.results?.[0]?.[0]?.transcript;
+          if (transcript?.trim()) {
+            handleUserQuery(transcript.trim(), true);
+          }
+        };
+        rec.onerror = (e: any) => {
+          console.warn('[Web Speech Recognition error]:', e);
+          setIsListening(false);
+        };
+        rec.onend = () => setIsListening(false);
+
+        recognitionRef.current = rec;
+        rec.start();
       } catch (err) {
-        console.warn('Could not start recognition:', err);
+        console.warn('Could not start web speech recognition:', err);
+        setIsListening(false);
       }
     }
   };
@@ -182,7 +232,12 @@ export const KisanMitraChatbot: React.FC = () => {
       setMessages(prev => [...prev, botMsg]);
 
       if (fromVoice) {
-        const speech = speakText(ragRes.answer, selectedLang, () => setIsSpeaking(true), () => setIsSpeaking(false));
+        const speech = speakText(
+          ragRes.answer,
+          selectedLang,
+          () => { setIsSpeaking(true); setSpeakingMsgId(botMsg.id); },
+          () => { setIsSpeaking(false); setSpeakingMsgId(null); }
+        );
         setActiveSpeechStop(() => speech.stop);
       }
     } catch {
@@ -197,14 +252,28 @@ export const KisanMitraChatbot: React.FC = () => {
     }
   };
 
-  const handleReadAloud = (text: string) => {
+  const handleReadAloud = (text: string, msgId?: string) => {
     unlockAudio();
     if (isSpeaking && activeSpeechStop) {
       activeSpeechStop();
       setIsSpeaking(false);
-      return;
+      const wasSame = speakingMsgId === msgId;
+      setSpeakingMsgId(null);
+      if (wasSame) return;
     }
-    const speech = speakText(text, selectedLang, () => setIsSpeaking(true), () => setIsSpeaking(false));
+    if (msgId) setSpeakingMsgId(msgId);
+    const speech = speakText(
+      text,
+      selectedLang,
+      () => {
+        setIsSpeaking(true);
+        if (msgId) setSpeakingMsgId(msgId);
+      },
+      () => {
+        setIsSpeaking(false);
+        setSpeakingMsgId(null);
+      }
+    );
     setActiveSpeechStop(() => speech.stop);
   };
 
@@ -524,18 +593,18 @@ export const KisanMitraChatbot: React.FC = () => {
                     <span style={{ fontSize: 9.5 }}>{msg.timestamp}</span>
                     {msg.sender === 'bot' && (
                       <button
-                        onClick={() => handleReadAloud(msg.text)}
+                        onClick={() => handleReadAloud(msg.text, msg.id)}
                         style={{
                           cursor: 'pointer', background: 'none', border: 'none',
-                          color: isSpeaking ? '#fbbf24' : 'inherit',
+                          color: isSpeaking && speakingMsgId === msg.id ? '#fbbf24' : 'inherit',
                           padding: 2, display: 'flex', alignItems: 'center',
                           transition: 'color 0.2s',
                         }}
-                        title="Read aloud"
+                        title={isSpeaking && speakingMsgId === msg.id ? "Stop speaking" : "Read aloud"}
                       >
-                        {isSpeaking
-                          ? <VolumeX style={{ width: 13, height: 13 }} />
-                          : <Volume2 style={{ width: 13, height: 13 }} />
+                        {isSpeaking && speakingMsgId === msg.id
+                          ? <VolumeX style={{ width: 14, height: 14, color: '#fbbf24' }} />
+                          : <Volume2 style={{ width: 14, height: 14 }} />
                         }
                       </button>
                     )}
