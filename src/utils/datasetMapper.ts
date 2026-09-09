@@ -3,6 +3,8 @@
  * KrishiRakshak AI Hybrid Engine
  */
 
+import { IP102_PEST_TAXONOMY } from './imageClassifier';
+
 export interface DiseaseKnowledge {
   className: string;
   crop: string;
@@ -936,10 +938,64 @@ export function getPestDetails(className: string): PestKnowledge {
     return PEST_TAXONOMY_KB[cleanKey];
   }
 
-  // Check case-insensitive match
+  // Check case-insensitive match in existing KB
   const foundKey = Object.keys(PEST_TAXONOMY_KB).find(k => k.toLowerCase() === className?.toLowerCase() || k.toLowerCase() === cleanKey?.toLowerCase());
   if (foundKey) {
     return PEST_TAXONOMY_KB[foundKey];
+  }
+
+  // Check in 102-Class IP102 Taxonomy
+  const ip102Item = IP102_PEST_TAXONOMY.find(item => 
+    item.className.toLowerCase() === className?.toLowerCase() ||
+    item.className.toLowerCase() === cleanKey?.toLowerCase() ||
+    item.pestName.toLowerCase() === className?.toLowerCase() ||
+    item.displayName.toLowerCase() === className?.toLowerCase()
+  );
+
+  if (ip102Item) {
+    const isBorerOrCutworm = ip102Item.className.toLowerCase().includes('borer') || ip102Item.className.toLowerCase().includes('cutworm') || ip102Item.className.toLowerCase().includes('locust') || ip102Item.className.toLowerCase().includes('army');
+    const isSuckingPest = ip102Item.className.toLowerCase().includes('aphid') || ip102Item.className.toLowerCase().includes('mite') || ip102Item.className.toLowerCase().includes('hopper') || ip102Item.className.toLowerCase().includes('thrips') || ip102Item.className.toLowerCase().includes('whitefly') || ip102Item.className.toLowerCase().includes('scale') || ip102Item.className.toLowerCase().includes('mealy');
+
+    return {
+      className: ip102Item.className,
+      pestName: ip102Item.displayName,
+      scientificName: ip102Item.scientificName,
+      riskLevel: isBorerOrCutworm ? 'HIGH' : isSuckingPest ? 'MEDIUM' : 'MEDIUM',
+      symptoms: isBorerOrCutworm ? [
+        `Extensive tunneling, boring into shoots, leaves or fruit of ${ip102Item.crop}`,
+        `Visible frass pellets and larval damage at entry sites`,
+        `Premature lodging, withered central shoots, or drop of developing fruit`
+      ] : isSuckingPest ? [
+        `Sap depletion, leaf curling, and chlorotic yellowing on ${ip102Item.crop}`,
+        `Sticky honeydew secretion promoting black sooty mold growth`,
+        `Stunted vegetative growth and reduced photosynthetic surface`
+      ] : [
+        `Chewed foliage margins, leaf skeletonization, or tissue damage on ${ip102Item.crop}`,
+        `Visible presence of adult or nymph feeding stages across crop canopy`
+      ],
+      organicControl: isBorerOrCutworm ? [
+        `Deploy species-specific pheromone delta traps @ 5–8 traps/acre`,
+        `Release Trichogramma egg parasitoids @ 40,000–50,000 per acre`,
+        `Apply Neem Seed Kernel Extract (NSKE 5%) or Bacillus thuringiensis (Bt) @ 2g/L`
+      ] : isSuckingPest ? [
+        `Install yellow and blue sticky traps @ 10–12 traps/acre`,
+        `Spray Cold-Pressed Neem Oil (10,000 ppm) @ 3–5ml/L with mild emulsifier`,
+        `Encourage ladybird beetles and green lacewing (Chrysoperla carnea) predators`
+      ] : [
+        `Handpick larvae/egg masses during early morning scouting`,
+        `Spray botanical extract (5% Neem / Pongamia oil emulsion)`,
+        `Intercrop with nectar-rich flowering border plants to conserve natural enemies`
+      ],
+      chemicalControl: isBorerOrCutworm ? [
+        `Spray Chlorantraniliprole 18.5% SC @ 0.3ml/L or Flubendiamide 39.35% SC @ 0.25ml/L water`,
+        `Apply Emamectin Benzoate 5% SG @ 0.4g/L during early instar stage`
+      ] : isSuckingPest ? [
+        `Spray Thiamethoxam 25% WG @ 0.3g/L or Acetamiprid 20% SP @ 0.2g/L water`,
+        `Apply Spiromesifen 22.9% SC @ 1ml/L for mite/whitefly complexes`
+      ] : [
+        `Apply contact insecticide (e.g. Cypermethrin 10% EC @ 1.5ml/L) if pest population breaches economic threshold level (ETL)`
+      ]
+    };
   }
 
   return {

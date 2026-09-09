@@ -38,7 +38,8 @@
 ## 🚀 Key Features & Capabilities
 
 ### 1. 🌿 Edge ML Leaf Pathogen & Pest Health Scanner (`/detect`)
-- **Zero-Latency In-Browser Inference**: Runs quantized ONNX models (`model.onnx` and `pest-model.onnx`) directly on the device using WebAssembly (`ort-wasm`).
+- **Zero-Latency In-Browser Inference**: Runs quantized ONNX models (`model.onnx` for foliar diseases, `pest-model.onnx` for 102-class insect pests) directly on the device using WebAssembly (`ort-wasm`).
+- **ResNet-50 IP102 102-Class Pest Sentinel**: Classifies **102 agricultural insect pest species** (Rice stem borers, Planthoppers, Armyworms, Aphids, Weevils, Fruit flies, Cutworms, Mites, Thrips, Beetles) based on the benchmark IP102 dataset with in-browser offline inference.
 - **Open-Set Pathogen Classifier**: Diagnoses 50+ crop diseases across Tomato, Potato, Wheat, Rice, Cotton, and Maize with image quality validation (blur/glare filters).
 - **Hybrid Decision Engine**: Fuses visual classification with local weather signals and micro-climate sensor telemetry to minimize false positives.
 - **Low-Confidence Human Escalation**: Scans with $<75\%$ confidence automatically queue for official review by agricultural officers.
@@ -112,7 +113,7 @@ flowchart TB
 | **Frontend Framework** | [Next.js 16 (App Router)](https://nextjs.org/), [React 19](https://react.dev/), [TypeScript 5](https://www.typescriptlang.org/) |
 | **Styling & UI** | [Tailwind CSS 4](https://tailwindcss.com/), Lucide Icons, Glassmorphic Modern Dark Theme |
 | **Mobile Runtime** | [Capacitor 8](https://capacitorjs.com/) (Android Native Java Bridge + Android WebView) |
-| **Edge Machine Learning** | [ONNX Runtime Web](https://onnxruntime.ai/) (WASM / SIMD / WebGL), PyTorch 2, EfficientNet-B0 |
+| **Edge Machine Learning** | [ONNX Runtime Web](https://onnxruntime.ai/) (WASM / SIMD / WebGL), PyTorch 2, ResNet-50 (IP102 102-Class Benchmark), MobileNetV3 |
 | **Mapping & GIS** | [Leaflet](https://leafletjs.com/), [React Leaflet 5](https://react-leaflet.js.org/) |
 | **Database & Auth** | [Supabase](https://supabase.com/) (PostgreSQL + RLS + Realtime) with LocalStorage / IndexedDB fallback |
 | **Multilingual AI** | Government of India Bhashini (ULCA / Dhruva), Web Speech API, Android `RecognizerIntent` & `TTS` |
@@ -135,9 +136,13 @@ KrishirakshaAI/
 │   ├── icons/                           # PWA & Web icons (192x192, 512x512)
 │   ├── ort-wasm/                        # ONNX Runtime WebAssembly binaries
 │   ├── kisanvaani_rag_kb.json           # Embedded KisanVaani RAG Knowledge Base
-│   ├── model.onnx                       # 19-class Crop Leaf Disease ONNX model
-│   ├── pest-model.onnx                  # 25-class Insect Pest Detection ONNX model
+│   ├── model.onnx                       # 19/38-class Crop Leaf Disease ONNX model
+│   ├── pest-model.onnx                  # 102-class Insect Pest ONNX model (ResNet-50 IP102, quantized INT8, ~22.8 MB)
+│   ├── pest-model-fp32.onnx             # 102-class ResNet-50 ONNX model (Full FP32 precision, ~90.4 MB)
+│   ├── pest_model_metadata.json         # 102-class taxonomy, normalization, and model metadata
 │   └── logo.png / logo-shield.png       # Official KrishiRakshak AI branding assets
+├── convert_resnet50_to_onnx.py          # PyTorch to ONNX exporter & dynamic INT8 quantizer
+├── resnet50_0.497.pkl                   # Pre-trained ResNet-50 IP102 checkpoint
 ├── scripts/
 │   ├── build-mobile.mjs                 # Mobile pipeline: Next.js export + Cap Sync
 │   └── generate_app_assets.py           # Generates all icon & splash screen densities
@@ -254,18 +259,22 @@ npm run cap:open
 
 KrishiRakshak AI features end-to-end Python pipelines for dataset preprocessing, model training, ONNX quantization, and RAG compilation:
 
-| Script | Purpose |
+| Script / Artifact | Purpose |
 | :--- | :--- |
+| `convert_resnet50_to_onnx.py` | Converts `resnet50_0.497.pkl` (ResNet-50 trained on IP102 benchmark) into INT8-quantized `public/pest-model.onnx` (22.78 MB) and FP32 `public/pest-model-fp32.onnx` (90.40 MB) for 102 insect pest classes. |
 | `build_kisanvaani_rag_kb.py` | Extracts agricultural FAQs & remedies from datasets and generates the vector knowledge base in `public/kisanvaani_rag_kb.json`. |
-| `train_hybrid_models.py` | Trains multi-crop leaf pathogen classifiers using PyTorch & EfficientNet-B0; exports to `public/model.onnx`. |
-| `train_dlcpd25_pest_model.py` | Trains the 25-class Indian agricultural insect pest model; exports to `public/pest-model.onnx`. |
+| `train_hybrid_models.py` | Trains multi-crop leaf pathogen classifiers using PyTorch & MobileNetV3; exports to `public/model.onnx`. |
+| `train_dlcpd25_pest_model.py` | Trains 25-class agricultural insect pest model checkpoints. |
 | `evaluate_metrics.py` | Calculates test-set Precision, Recall, F1-score, and ROC-AUC curves. |
 
-To run the ML scripts:
+### Exporting the 102-Class ResNet-50 Pest ONNX Model
+To export or re-quantize the ResNet-50 model from the PyTorch checkpoint:
 ```bash
-pip install -r requirements.txt
-python build_kisanvaani_rag_kb.py
+python convert_resnet50_to_onnx.py
 ```
+- **Input Dimensions**: `[1, 3, 224, 224]` NCHW
+- **Normalization**: ImageNet standards (`mean=[0.485, 0.456, 0.406]`, `std=[0.229, 0.224, 0.225]`)
+- **Quantization**: Dynamic INT8 reduction from **90.40 MB** down to **22.78 MB** (74.8% reduction), achieving sub-30ms client-side inference in web and Android WebView.
 
 ---
 

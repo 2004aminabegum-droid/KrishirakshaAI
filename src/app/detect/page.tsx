@@ -384,7 +384,7 @@ export default function DetectPage() {
             )}
             <p className="text-xs leading-relaxed opacity-95">
               {analysisMode === 'pest'
-                ? 'DLCPD-25 25-Class Pest ML Architecture: Recognizes 25 major agricultural crop pests (Aphids, Bollworms, Planthoppers, Whiteflies, Thrips, Fall Armyworms, Stem Borers, Mites, Grubs, Leaf Folders, Weevils, Locusts, etc.) with in-browser offline ONNX execution & cloud hybrid intelligence.'
+                ? 'ResNet-50 IP102 102-Class Pest ML Architecture: Recognizes 102 agricultural insect pest species (Rice pests, Corn borers, Aphids, Planthoppers, Weevils, Fruit flies, Cutworms, Mites, Thrips, Armyworms, etc.) with in-browser offline ONNX execution & cloud hybrid intelligence.'
                 : t('datasetScopeNotice')}
             </p>
           </div>
@@ -400,7 +400,7 @@ export default function DetectPage() {
                   <Upload className="h-3.5 w-3.5 inline mr-1.5" />Disease from leaf
                 </button>
                 <button onClick={() => { setAnalysisMode('pest'); resetScanner(); }} className={`py-3 text-xs font-bold rounded-lg border transition-all ${analysisMode === 'pest' ? 'bg-amber-600 border-amber-500 text-white shadow' : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'}`}>
-                  <Bug className="h-3.5 w-3.5 inline mr-1.5" />DLCPD-25 Pest (25 Cls)
+                  <Bug className="h-3.5 w-3.5 inline mr-1.5" />ResNet-50 Pest (102 Cls)
                 </button>
                 <button onClick={() => { setAnalysisMode('environmental'); setSourceMode('manual'); resetScanner(); }} className={`py-3 text-xs font-bold rounded-lg border transition-all ${analysisMode === 'environmental' ? 'bg-sky-600 border-sky-500 text-white shadow' : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'}`}>
                   <Activity className="h-3.5 w-3.5 inline mr-1.5" />Soil & climate risk
@@ -601,7 +601,7 @@ export default function DetectPage() {
                     <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-900 space-y-3">
                       <div className="flex items-center justify-between">
                         <span className="text-[10px] uppercase font-bold text-slate-500 tracking-widest">
-                          {analysisMode === 'pest' || scanResult?.type === 'pest' ? '🎯 DLCPD-25 Pest Identified' : t('diseaseDetected')}
+                          {analysisMode === 'pest' || scanResult?.type === 'pest' ? '🎯 IP102 Pest Identified' : t('diseaseDetected')}
                         </span>
                         {hybridResult?.inferenceTimeMs !== undefined && (
                           <span className="text-[10px] font-mono text-slate-400 bg-slate-900/80 px-2 py-0.5 rounded border border-slate-800">
