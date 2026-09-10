@@ -217,3 +217,42 @@ export const dbService = {
     localStorage.setItem(MOCK_STORAGE_KEY_HOTSPOTS, JSON.stringify(current));
   }
 };
+
+export interface PgVectorSearchResult {
+  id: string;
+  question: string;
+  answer: string;
+  category: string;
+  similarity: number;
+}
+
+/**
+ * Executes a semantic vector search using Supabase pgvector RPC function
+ */
+export async function searchKisanVaaniPgVector(
+  queryEmbedding: number[],
+  matchThreshold: number = 0.25,
+  matchCount: number = 5
+): Promise<PgVectorSearchResult[]> {
+  if (isSupabaseConfigured && supabase) {
+    try {
+      const { data, error } = await supabase.rpc('match_kisanvaani_rag', {
+        query_embedding: queryEmbedding,
+        match_threshold: matchThreshold,
+        match_count: matchCount
+      });
+      if (!error && Array.isArray(data)) {
+        return data.map((row: any) => ({
+          id: row.id,
+          question: row.question,
+          answer: row.answer,
+          category: row.category,
+          similarity: Number(row.similarity) || 0
+        }));
+      }
+    } catch (err) {
+      console.warn('[Supabase pgvector search failed, falling back to local vector]:', err);
+    }
+  }
+  return [];
+}

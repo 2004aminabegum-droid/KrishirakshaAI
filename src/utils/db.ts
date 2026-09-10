@@ -1,5 +1,5 @@
 const DB_NAME = 'KrishiRakshakDB';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 export interface ScanRecord {
   id: string;
@@ -65,6 +65,9 @@ class IndexedDBService {
         }
         if (!db.objectStoreNames.contains('sync_queue')) {
           db.createObjectStore('sync_queue', { keyPath: 'id' });
+        }
+        if (!db.objectStoreNames.contains('rag_kb')) {
+          db.createObjectStore('rag_kb', { keyPath: 'id' });
         }
       };
     });
@@ -202,6 +205,59 @@ class IndexedDBService {
       request.onsuccess = () => resolve();
       request.onerror = () => reject(request.error);
     });
+  }
+
+  // --- KisanVaani RAG Knowledge Base Store (Offline Persistence) ---
+  async getRagKB(): Promise<any[]> {
+    try {
+      const db = await this.initDB();
+      return new Promise((resolve) => {
+        if (!db.objectStoreNames.contains('rag_kb')) {
+          resolve([]);
+          return;
+        }
+        const transaction = db.transaction('rag_kb', 'readonly');
+        const store = transaction.objectStore('rag_kb');
+        const request = store.get('kisanvaani_22k_bundle');
+
+        request.onsuccess = () => {
+          if (request.result && Array.isArray(request.result.items)) {
+            resolve(request.result.items);
+          } else {
+            resolve([]);
+          }
+        };
+        request.onerror = () => resolve([]);
+      });
+    } catch {
+      return [];
+    }
+  }
+
+  async saveRagKB(items: any[]): Promise<void> {
+    if (!items || items.length === 0) return;
+    try {
+      const db = await this.initDB();
+      return new Promise((resolve, reject) => {
+        if (!db.objectStoreNames.contains('rag_kb')) {
+          resolve();
+          return;
+        }
+        const transaction = db.transaction('rag_kb', 'readwrite');
+        const store = transaction.objectStore('rag_kb');
+        const request = store.put({
+          id: 'kisanvaani_22k_bundle',
+          items,
+          total: items.length,
+          savedAt: Date.now()
+        });
+
+        request.onsuccess = () => resolve();
+        request.onerror = () => reject(request.error);
+      });
+    } catch (err) {
+      console.warn('[IndexedDB saveRagKB error]:', err);
+    }
   }
 }
 

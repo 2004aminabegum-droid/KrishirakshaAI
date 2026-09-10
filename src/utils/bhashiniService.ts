@@ -37,13 +37,69 @@ export function getLanguageConfig(code: string): SupportedBhashiniLanguage {
 
 // ─── Translation ─────────────────────────────────────────────────────────────
 
+// Common Indian agricultural terminology mapping for offline semantic extraction
+const OFFLINE_AGRI_TERMS: Record<string, string> = {
+  // Crops
+  'गेहूं': 'wheat', 'गेहूँ': 'wheat', 'गम': 'wheat', 'గోధుమ': 'wheat', 'கோதுமை': 'wheat',
+  'धान': 'rice paddy', 'चावल': 'rice paddy', 'ধান': 'rice paddy', 'వరి': 'rice paddy', 'அரிசி': 'rice paddy', 'भात': 'rice paddy',
+  'आलू': 'potato', 'আলু': 'potato', 'బంగాళాదుంప': 'potato', 'உருளைக்கிழங்கு': 'potato', 'बटाटा': 'potato',
+  'टमाटर': 'tomato', 'টমেটো': 'tomato', 'టమోటా': 'tomato', 'தக்காளி': 'tomato',
+  'मक्का': 'maize corn', 'ভুট্টা': 'maize corn', 'మొక్కజొన్న': 'maize corn',
+  'सरसों': 'mustard', 'সরিষা': 'mustard', 'ఆవాలు': 'mustard', 'கடுகு': 'mustard',
+  'कपास': 'cotton', 'তুলা': 'cotton', 'பருத்தி': 'cotton',
+  'गन्ना': 'sugarcane', 'আখ': 'sugarcane', 'చెరకు': 'sugarcane', 'கரும்பு': 'sugarcane',
+  'सोयाबीन': 'soybean', 'সয়াবিন': 'soybean',
+
+  // Pathogens & Pests
+  'कीट': 'pest insect', 'कीड़ा': 'pest insect', 'পোকা': 'pest insect', 'పురుగు': 'pest insect', 'பூச்சி': 'pest insect',
+  'बीमारी': 'disease', 'रोग': 'disease', 'ব্যাধি': 'disease', 'వ్యాధి': 'disease', 'நோய்': 'disease',
+  'रतुआ': 'rust', 'मरिचा': 'rust', 'తుప్పు': 'rust',
+  'झुलसा': 'blight', 'ध्वसा': 'blight', 'బ్లైట్': 'blight',
+  'माहू': 'aphid', 'चेपा': 'aphid', 'जाब': 'aphid',
+  'सुंडी': 'caterpillar borer armyworm', 'इल्ली': 'caterpillar borer armyworm', 'लेदा': 'caterpillar armyworm',
+  'सफेद मक्खी': 'whitefly', 'সাদা মাছি': 'whitefly',
+
+  // Agronomic Practices & Inputs
+  'खाद': 'fertilizer manure', 'उर्वरक': 'fertilizer', 'সার': 'fertilizer', 'ఎరువు': 'fertilizer', 'உரம்': 'fertilizer',
+  'यूरिया': 'urea', 'ইউরিয়া': 'urea', 'యూరియా': 'urea',
+  'नीम': 'neem', 'নিম': 'neem', 'వేప': 'neem', 'வேம்பு': 'neem',
+  'सिंचाई': 'irrigation water', 'पानी': 'irrigation water', 'সেচ': 'irrigation', 'నీటిపారుదల': 'irrigation', 'பாசனம்': 'irrigation',
+  'फसल चक्र': 'crop rotation', 'ফসল পর্যায়': 'crop rotation', 'పంట మార్పిడి': 'crop rotation',
+  'रोकथाम': 'control management remedy treatment', 'उपाय': 'remedy treatment', 'প্রতিকার': 'remedy treatment',
+  'दवा': 'pesticide medicine', 'छिड़काव': 'spray application'
+};
+
+export function translateOfflineDictionary(text: string, sourceLang: string, targetLang: string): string {
+  if (!text) return '';
+  if (sourceLang === targetLang) return text;
+
+  if (targetLang === 'en') {
+    const englishKeywords: string[] = [];
+    const lower = text.toLowerCase();
+    for (const [nativeTerm, engEquiv] of Object.entries(OFFLINE_AGRI_TERMS)) {
+      if (lower.includes(nativeTerm.toLowerCase())) {
+        englishKeywords.push(engEquiv);
+      }
+    }
+    if (englishKeywords.length > 0) {
+      return englishKeywords.join(' ') + ' ' + text;
+    }
+  }
+  return text;
+}
+
 async function translateSegmentDirect(text: string, sourceLang: string, targetLang: string): Promise<string> {
   if (!text || !text.trim() || sourceLang === targetLang) return text;
+
+  // 1. Instant offline bypass if disconnected
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    return translateOfflineDictionary(text, sourceLang, targetLang);
+  }
 
   const bhashiniApiKey = typeof process !== 'undefined' ? process.env?.BHASHINI_API_KEY : undefined;
   const bhashiniUserId = typeof process !== 'undefined' ? process.env?.BHASHINI_USER_ID : undefined;
 
-  // 1. Bhashini ULCA if configured
+  // 2. Bhashini ULCA if configured
   if (bhashiniApiKey && bhashiniUserId) {
     try {
       const response = await fetch('https://dhruva-api.bhashini.gov.in/services/inference/pipeline', {
@@ -58,7 +114,7 @@ async function translateSegmentDirect(text: string, sourceLang: string, targetLa
           pipelineTasks: [{ taskType: 'translation', config: { language: { sourceLanguage: sourceLang, targetLanguage: targetLang } } }],
           inputData: { input: [{ source: text }] }
         }),
-        signal: AbortSignal.timeout(4000)
+        signal: AbortSignal.timeout(2500)
       });
       if (response.ok) {
         const data = await response.json();
@@ -68,10 +124,10 @@ async function translateSegmentDirect(text: string, sourceLang: string, targetLa
     } catch {}
   }
 
-  // 2. MyMemory Neural NMT fallback
+  // 3. MyMemory Neural NMT fallback
   try {
     const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${sourceLang}|${targetLang}`;
-    const res = await fetch(url, { headers: { 'User-Agent': 'KrishiRakshak-AI/1.0' }, signal: AbortSignal.timeout(5000) });
+    const res = await fetch(url, { headers: { 'User-Agent': 'KrishiRakshak-AI/1.0' }, signal: AbortSignal.timeout(2500) });
     if (res.ok) {
       const data = await res.json();
       const out = data?.responseData?.translatedText;
@@ -79,7 +135,8 @@ async function translateSegmentDirect(text: string, sourceLang: string, targetLa
     }
   } catch {}
 
-  return text;
+  // 4. Offline fallback
+  return translateOfflineDictionary(text, sourceLang, targetLang);
 }
 
 export async function translateTextBhashini(text: string, targetLang: string, sourceLang: string = 'en'): Promise<string> {
