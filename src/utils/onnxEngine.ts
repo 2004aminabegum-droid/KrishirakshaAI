@@ -3,7 +3,7 @@
  * KrishiRakshak AI Offline Model Runtime
  */
 
-import { SUPPORTED_TAXONOMY, LOCAL_DISEASE_TAXONOMY, PLANTVILLAGE_TAXONOMY, DLCPD25_PEST_TAXONOMY } from './imageClassifier';
+import { SUPPORTED_TAXONOMY, LOCAL_DISEASE_TAXONOMY, PLANTVILLAGE_TAXONOMY, DLCPD25_PEST_TAXONOMY, IP102_PEST_TAXONOMY } from './imageClassifier';
 
 export interface OfflinePrediction {
   topClass: string;
@@ -55,11 +55,11 @@ export async function runOfflineInference(
       throw new Error('ONNX inference returned empty tensor data');
     }
 
-    const isPestMode = modelPath.includes('pest') || rawData.length === DLCPD25_PEST_TAXONOMY.length;
+    const isPestMode = modelPath.includes('pest') || rawData.length === IP102_PEST_TAXONOMY.length || rawData.length === DLCPD25_PEST_TAXONOMY.length;
 
     let taxonomy: Array<{ className: string; crop: string; displayName: string }>;
     if (isPestMode) {
-      taxonomy = DLCPD25_PEST_TAXONOMY;
+      taxonomy = rawData.length >= IP102_PEST_TAXONOMY.length ? IP102_PEST_TAXONOMY : DLCPD25_PEST_TAXONOMY;
     } else if (rawData.length === LOCAL_DISEASE_TAXONOMY.length) {
       taxonomy = LOCAL_DISEASE_TAXONOMY;
     } else if (rawData.length >= PLANTVILLAGE_TAXONOMY.length) {
@@ -74,7 +74,9 @@ export async function runOfflineInference(
     const logits = rawLogits.map((logit, idx) => {
       const item = taxonomy[idx];
       if (!isPestMode && selectedCrop && item?.crop && (item.crop.toLowerCase() === selectedCrop.toLowerCase() || item.className === 'Healthy')) {
-        return logit + 1.5; // Crop prior boost
+        return logit + 1.5; // Disease Crop prior boost
+      } else if (isPestMode && selectedCrop && item?.crop && item.crop.toLowerCase().includes(selectedCrop.toLowerCase())) {
+        return logit + 1.0; // Pest Crop prior boost
       }
       return logit;
     });
