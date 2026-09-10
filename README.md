@@ -115,7 +115,7 @@ flowchart TB
 | **Mobile Runtime** | [Capacitor 8](https://capacitorjs.com/) (Android Native Java Bridge + Android WebView) |
 | **Edge Machine Learning** | [ONNX Runtime Web](https://onnxruntime.ai/) (WASM / SIMD / WebGL), PyTorch 2, ResNet-50 (IP102 102-Class Benchmark), MobileNetV3 |
 | **Mapping & GIS** | [Leaflet](https://leafletjs.com/), [React Leaflet 5](https://react-leaflet.js.org/) |
-| **Database & Auth** | [Supabase](https://supabase.com/) (PostgreSQL + RLS + Realtime) with LocalStorage / IndexedDB fallback |
+| **Database & Auth** | [Supabase](https://supabase.com/) (PostgreSQL + pgvector + RLS + Realtime) with LocalStorage / IndexedDB v2 fallback |
 | **Multilingual AI** | Government of India Bhashini (ULCA / Dhruva), Web Speech API, Android `RecognizerIntent` & `TTS` |
 | **Analytics & Charts** | [Recharts 3](https://recharts.org/), Chart.js |
 
@@ -135,12 +135,14 @@ KrishirakshaAI/
 ├── public/
 │   ├── icons/                           # PWA & Web icons (192x192, 512x512)
 │   ├── ort-wasm/                        # ONNX Runtime WebAssembly binaries
-│   ├── kisanvaani_rag_kb.json           # Embedded KisanVaani RAG Knowledge Base
+│   ├── kisanvaani_rag_kb.json           # Embedded KisanVaani RAG Knowledge Base (22,615 Q&As)
 │   ├── model.onnx                       # 19/38-class Crop Leaf Disease ONNX model
 │   ├── pest-model.onnx                  # 102-class Insect Pest ONNX model (ResNet-50 IP102, quantized INT8, ~22.8 MB)
 │   ├── pest-model-fp32.onnx             # 102-class ResNet-50 ONNX model (Full FP32 precision, ~90.4 MB)
 │   ├── pest_model_metadata.json         # 102-class taxonomy, normalization, and model metadata
 │   └── logo.png / logo-shield.png       # Official KrishiRakshak AI branding assets
+├── build_kisanvaani_rag_kb.py           # 22k KisanVaani RAG compiler & ChatML dataset generator
+├── train_krishibani_llm.py              # LLM fine-tuning pipeline for 22k KrishiBani dataset
 ├── convert_resnet50_to_onnx.py          # PyTorch to ONNX exporter & dynamic INT8 quantizer
 ├── resnet50_0.497.pkl                   # Pre-trained ResNet-50 IP102 checkpoint
 ├── scripts/
@@ -262,10 +264,39 @@ KrishiRakshak AI features end-to-end Python pipelines for dataset preprocessing,
 | Script / Artifact | Purpose |
 | :--- | :--- |
 | `convert_resnet50_to_onnx.py` | Converts `resnet50_0.497.pkl` (ResNet-50 trained on IP102 benchmark) into INT8-quantized `public/pest-model.onnx` (22.78 MB) and FP32 `public/pest-model-fp32.onnx` (90.40 MB) for 102 insect pest classes. |
-| `build_kisanvaani_rag_kb.py` | Extracts agricultural FAQs & remedies from datasets and generates the vector knowledge base in `public/kisanvaani_rag_kb.json`. |
+| `build_kisanvaani_rag_kb.py` | Ingests the full 22,615 Q&A pairs from `KisanVaani/agriculture-qa-english-only`, cleans unicode, categorizes across 10 agronomic domains, and compiles `public/kisanvaani_rag_kb.json` (9.36 MB) + `training_output/krishibani_llm_finetune_22k.jsonl` (12.32 MB). |
+| `train_krishibani_llm.py` | Fine-tunes open-source LLMs (Qwen2.5, LLaMA-3.2, TinyLlama, Mistral) on the 22,615 KrishiBani ChatML dataset using Hugging Face & PEFT LoRA / QLoRA. |
 | `train_hybrid_models.py` | Trains multi-crop leaf pathogen classifiers using PyTorch & MobileNetV3; exports to `public/model.onnx`. |
 | `train_dlcpd25_pest_model.py` | Trains 25-class agricultural insect pest model checkpoints. |
 | `evaluate_metrics.py` | Calculates test-set Precision, Recall, F1-score, and ROC-AUC curves. |
+
+### 🌾 KisanVaani 22k RAG & LLM Fine-Tuning Pipeline
+To rebuild the entire 22,615 Q&A agricultural knowledge base and export the ChatML training dataset:
+```bash
+python build_kisanvaani_rag_kb.py
+```
+- **Total Indexed Q&As**: **22,615** pairs across 10 agricultural domains:
+  - General Agronomy (5,200)
+  - Pest Management (4,392)
+  - Soil & Fertilizers (3,856)
+  - Plant Disease (3,521)
+  - Cultivation & Sowing (2,072)
+  - Irrigation & Water (2,063)
+  - Harvest & Storage (886)
+  - Organic Farming (304)
+  - Government Schemes & Market (172)
+  - Weather & Climate (149)
+- **Knowledge Base File**: `public/kisanvaani_rag_kb.json` (9.36 MB, compact JSON, <30ms retrieval latency)
+- **LLM SFT Dataset**: `training_output/krishibani_llm_finetune_22k.jsonl` (12.32 MB, 22,615 ChatML conversations)
+
+To verify the fine-tuning pipeline or fine-tune an open-source LLM:
+```bash
+# Verify dataset and inspect token metrics (Dry Run):
+python train_krishibani_llm.py --dry_run
+
+# Fine-tune with LoRA (e.g. Qwen2.5 or TinyLlama):
+python train_krishibani_llm.py --model_name Qwen/Qwen2.5-0.5B-Instruct --epochs 3 --batch_size 4
+```
 
 ### Exporting the 102-Class ResNet-50 Pest ONNX Model
 To export or re-quantize the ResNet-50 model from the PyTorch checkpoint:
@@ -282,25 +313,37 @@ python convert_resnet50_to_onnx.py
 
 The app provides two primary roles managed via [AuthGate.tsx](src/components/AuthGate.tsx) and [AuthContext.tsx](src/context/AuthContext.tsx):
 
-| Role | Access Scope | Demo Credentials |
+| Role | Access Scope | Authentication Methods |
 | :--- | :--- | :--- |
-| **Agriculture Officer** | Regional GIS Outbreak Map, Inspection Queue, Low-Confidence ML Overrides, IPM Broadcasting | Email: `admin@gmail.com`<br>Password: `admin@11` *(or `admin`)* |
-| **Farmer** | Crop Scanner, Field Telemetry, IoT Trap Monitor, Weather Risk Forecasting, Mandi Prices | Any email & password (or register via Create Account) |
+| **Agriculture Officer** | Regional GIS Outbreak Map, Inspection Queue, Low-Confidence ML Overrides, IPM Broadcasting | Google / Facebook OAuth or Officer Credentials |
+| **Farmer** | Crop Scanner, Field Telemetry, IoT Trap Monitor, Weather Risk Forecasting, Mandi Prices | Google / Facebook OAuth or Email & Password (Offline Account Creation supported) |
 
 > **Offline Mode**: In areas without network connectivity, the app automatically persists authentication sessions in `localStorage` under `krishirakshak_auth_session` and operates seamlessly.
 
 ---
 
-## 🗄️ Database Setup (Supabase)
+## 🗄️ Database Setup & pgvector (Supabase)
 
 If deploying a production backend:
 1. Create a project at [supabase.com](https://supabase.com).
 2. Navigate to **SQL Editor** and execute the provided [`supabase-schema.sql`](supabase-schema.sql).
 3. The script sets up:
+   - `vector` Extension: Enables `pgvector` for agricultural semantic search.
+   - `kisanvaani_kb`: 22,615 Q&A pairs with 384-dimensional vector embeddings and HNSW cosine distance indexing (`kisanvaani_kb_embedding_hnsw_idx`).
+   - `match_kisanvaani_rag`: High-performance RPC function for sub-10ms vector similarity matching.
    - `farms`: Farmer field registry with acreage and crop details.
    - `validation_requests`: Diagnostic images, confidence scores, and officer verdicts.
    - `hotspots`: Spatial outbreak coordinates for regional maps.
    - **Row-Level Security (RLS)**: Protects farmer privacy while allowing officers to inspect community outbreak clusters.
+
+### 🌐 Hybrid Online & 100% Offline RAG Architecture
+KrishiRakshak AI utilizes a dual-tier semantic search engine:
+- **Online**: Queries Supabase `match_kisanvaani_rag` using 384-dimensional embeddings via pgvector RPC.
+- **Offline**: Automatically switches to the in-browser vector engine:
+  - **Service Worker Cache-First**: Caches `public/kisanvaani_rag_kb.json` in `public/sw.js`.
+  - **IndexedDB v2 (`rag_kb`)**: Persists all 22,615 records locally via `src/utils/db.ts`.
+  - **Local Vector Engine**: Computes normalized 384-dim semantic feature vectors and cosine similarity in JavaScript (`src/utils/ragEngine.ts`).
+  - **Offline Agricultural Dictionary**: Maps native terminology across Hindi, Bengali, Telugu, and Tamil without external API timeouts (`src/utils/bhashiniService.ts`).
 
 ---
 

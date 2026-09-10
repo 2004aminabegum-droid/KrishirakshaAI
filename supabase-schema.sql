@@ -91,3 +91,62 @@ SELECT ID, 'AGRICULTURE ADMINISTRATOR', 'OFFICER'
 FROM AUTH.USERS
 WHERE EMAIL = 'admin@gmail.com'
 ON CONFLICT (ID) DO UPDATE SET ROLE = 'OFFICER';
+
+-- ==============================================================================
+-- 🚀 SUPABASE PGVECTOR EXTENSION FOR SEMANTIC RAG KNOWLEDGE BASE
+-- ==============================================================================
+create extension if not exists vector;
+
+-- KisanVaani Agricultural Knowledge Base with Vector Embeddings (384-dimensional)
+create table if not exists public.kisanvaani_kb (
+  id text primary key,
+  question text not null,
+  answer text not null,
+  category text not null,
+  keywords text[] default '{}',
+  embedding vector(384), -- 384-dim for MiniLM / BGE-small / Hugging Face embeddings
+  source text default 'KisanVaani Agriculture Dataset (Hugging Face)',
+  created_at timestamptz not null default now()
+);
+
+-- HNSW / IVFFlat vector index for sub-10ms semantic similarity queries
+create index if not exists kisanvaani_kb_embedding_hnsw_idx 
+  on public.kisanvaani_kb using hnsw (embedding vector_cosine_ops);
+
+-- Enable RLS and allow public / authenticated farmers to query the knowledge base
+alter table public.kisanvaani_kb enable row level security;
+drop policy if exists "Anyone can read KisanVaani Knowledge Base" on public.kisanvaani_kb;
+create policy "Anyone can read KisanVaani Knowledge Base" on public.kisanvaani_kb for select using (true);
+
+-- RPC Function for vector similarity search using pgvector cosine distance (<=>)
+create or replace function public.match_kisanvaani_rag (
+  query_embedding vector(384),
+  match_threshold float default 0.25,
+  match_count int default 5
+)
+returns table (
+  id text,
+  question text,
+  answer text,
+  category text,
+  similarity float
+)
+language plpgsql
+stable
+as $$
+begin
+  return query
+  select
+    kb.id,
+    kb.question,
+    kb.answer,
+    kb.category,
+    (1 - (kb.embedding <=> query_embedding))::float as similarity
+  from public.kisanvaani_kb kb
+  where kb.embedding is not null
+    and (1 - (kb.embedding <=> query_embedding)) > match_threshold
+  order by kb.embedding <=> query_embedding
+  limit match_count;
+end;
+$$;
+

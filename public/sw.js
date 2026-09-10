@@ -1,4 +1,4 @@
-const CACHE_NAME = 'krishirakshak-cache-v2';
+const CACHE_NAME = 'krishirakshak-cache-v3';
 const ASSETS_TO_CACHE = [
   '/',
   '/manifest.ts',
@@ -7,15 +7,18 @@ const ASSETS_TO_CACHE = [
   '/model.onnx',
   '/pest-model.onnx',
   '/model_metadata.json',
-  '/pest_model_metadata.json'
+  '/pest_model_metadata.json',
+  '/kisanvaani_rag_kb.json'
 ];
 
 // Install Event - cache core shell assets
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      console.log('[Service Worker] Caching App Shell...');
-      return cache.addAll(ASSETS_TO_CACHE);
+      console.log('[Service Worker] Caching App Shell & KisanVaani RAG KB...');
+      return cache.addAll(ASSETS_TO_CACHE).catch((err) => {
+        console.warn('[Service Worker] Cache addAll warning:', err);
+      });
     })
   );
   self.skipWaiting();
@@ -38,10 +41,29 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
-// Fetch Event - Network first fallback to cache
+// Fetch Event - Network first fallback to cache (Cache-First for RAG KB)
 self.addEventListener('fetch', (event) => {
   // Only handle GET requests and skip browser extensions or chrome-extension schemes
   if (event.request.method !== 'GET' || !event.request.url.startsWith(self.location.origin)) {
+    return;
+  }
+
+  // 🌾 For KisanVaani RAG Knowledge Base: Cache-First for instant offline availability
+  if (event.request.url.includes('kisanvaani_rag_kb.json')) {
+    event.respondWith(
+      caches.match(event.request).then((cached) => {
+        if (cached) return cached;
+        return fetch(event.request)
+          .then((networkRes) => {
+            if (networkRes && networkRes.status === 200) {
+              const clone = networkRes.clone();
+              caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+            }
+            return networkRes;
+          })
+          .catch(() => cached);
+      })
+    );
     return;
   }
 
