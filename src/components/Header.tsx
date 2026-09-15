@@ -72,8 +72,8 @@ export const Header: React.FC<HeaderProps> = ({ role }) => {
     }
   };
 
-  // Farmer tabs: Dashboard, Detect, Surveillance, Forecasting, IPM
-  // Officer tabs: Dashboard, Surveillance & Trends, Map, IPM
+  // Farmer tabs: Dashboard, Detect, Surveillance, Forecasting, Environmental Risk, IPM, Profile
+  // Officer tabs: Dashboard, Surveillance & Trends, Map, IPM, Profile
   const farmerTabs = [
     { name: t('navDashboard'), path: '/dashboard/farmer', icon: TrendingUp },
     { name: t('navDetect'), path: '/detect', icon: Leaf },
@@ -81,6 +81,7 @@ export const Header: React.FC<HeaderProps> = ({ role }) => {
     { name: t('navForecasting'), path: '/forecasting', icon: CloudRain },
     { name: t('navEnvironmentalRisk'), path: '/environmental-risk', icon: Sprout },
     { name: t('navIPM'), path: '/ipm', icon: BookOpen },
+    { name: t('navProfile'), path: '/profile', icon: UserCheck },
   ];
 
   const officerTabs = [
@@ -88,6 +89,7 @@ export const Header: React.FC<HeaderProps> = ({ role }) => {
     { name: t('navSurveillance'), path: '/surveillance?view=officer', icon: Bug },
     { name: t('navMap'), path: '/map', icon: MapPin },
     { name: t('navIPM'), path: '/ipm', icon: BookOpen },
+    { name: t('navProfile'), path: '/profile', icon: UserCheck },
   ];
 
   const activeTabs = role === 'farmer' ? farmerTabs : officerTabs;
@@ -212,6 +214,22 @@ export const Header: React.FC<HeaderProps> = ({ role }) => {
                 </button>
               </div>
             </div>
+
+            {/* Profile Link */}
+            <Link
+              href="/profile"
+              title={t('navProfile')}
+              className={`flex h-9 shrink-0 items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-bold transition-all ${
+                pathname === '/profile'
+                  ? 'border-green-500/50 bg-green-950/40 text-green-300 shadow-sm shadow-green-500/20'
+                  : 'border-slate-800 bg-slate-900 text-slate-300 hover:border-slate-700 hover:text-white'
+              }`}
+            >
+              <div className="h-5 w-5 rounded-full bg-gradient-to-tr from-green-500 to-emerald-400 flex items-center justify-center text-[10px] text-slate-950 font-black">
+                {role === 'officer' ? 'AO' : 'KM'}
+              </div>
+              <span className="hidden min-[1201px]:inline">{t('navProfile')}</span>
+            </Link>
 
             <button onClick={() => signOut().then(() => router.replace('/login'))} title={t('signOut')} className="flex h-9 shrink-0 items-center gap-1.5 rounded-lg border border-slate-700 px-2.5 py-1.5 text-xs font-bold text-slate-300 hover:border-rose-500/50 hover:text-rose-300">
               <UserCheck className="h-3.5 w-3.5" />
