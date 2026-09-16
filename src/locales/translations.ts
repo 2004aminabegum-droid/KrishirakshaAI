@@ -270,7 +270,13 @@ export const translations = {
     farmPlotUpdated: "Farm plot updated successfully!",
     farmPlotDeleted: "Farm plot removed successfully!",
     storageManagement: "Offline Cache & Storage Management",
-    cacheCleared: "Local scan cache cleared successfully."
+    cacheCleared: "Local scan cache cleared successfully.",
+    editProfile: "Edit Profile & Photo",
+    servicesAndFeatures: "Services & Farm Operations",
+    changePhoto: "Change Profile Picture",
+    uploadPhoto: "Upload from Device",
+    choosePreset: "Choose an Avatar Preset",
+    restrictedAccessNotice: "Access Restricted: Administration is only accessible to authorized Agriculture Officers."
   },
   hi: {
     title: "कृषिरक्षक AI",
@@ -541,7 +547,13 @@ export const translations = {
     farmPlotUpdated: "खेत विवरण सफलतापूर्वक अपडेट हुआ!",
     farmPlotDeleted: "खेत हटा दिया गया!",
     storageManagement: "ऑफ़लाइन कैश और स्टोरेज प्रबंधन",
-    cacheCleared: "स्थानीय स्कैन कैश सफलतापूर्वक साफ़ हो गया।"
+    cacheCleared: "स्थानीय स्कैन कैश सफलतापूर्वक साफ़ हो गया।",
+    editProfile: "प्रोफ़ाइल और फोटो संपादित करें",
+    servicesAndFeatures: "सेवाएं एवं कृषि संचालन",
+    changePhoto: "प्रोफ़ाइल फ़ोटो बदलें",
+    uploadPhoto: "डिवाइस से अपलोड करें",
+    choosePreset: "अवतार प्रीसेट चुनें",
+    restrictedAccessNotice: "पहुंच प्रतिबंधित: प्रशासन केवल अधिकृत कृषि अधिकारियों के लिए उपलब्ध है।"
   },
   bn: {
     title: "কৃষিরক্ষক AI",
@@ -813,5 +825,12 @@ export const translations = {
     farmPlotDeleted: "ফসলি জমি মুছে ফেলা হয়েছে!",
     storageManagement: "অফলাইন ক্যাশ ও স্টোরেজ ম্যানেজমেন্ট",
     cacheCleared: "স্থানীয় স্ক্যান ক্যাশ সফলভাবে মুছে ফেলা হয়েছে।"
+,
+    editProfile: "প্রোফাইল এবং ছবি সম্পাদনা করুন",
+    servicesAndFeatures: "পরিষেবা এবং খামার পরিচালনা",
+    changePhoto: "প্রোফাইল ছবি পরিবর্তন করুন",
+    uploadPhoto: "ডিভাইস থেকে আপলোড করুন",
+    choosePreset: "একটি অবতার প্রিসেট বাছুন",
+    restrictedAccessNotice: "প্রবেশাধিকার সংরক্ষিত: প্রশাসন শুধুমাত্র অনুমোদিত কৃষি কর্মকর্তাদের জন্য উপলব্ধ।"
   }
 };

@@ -1,283 +1,401 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useLanguage } from '../context/LanguageContext';
-import { useOffline } from '../context/OfflineContext';
 import { 
-  Leaf, 
-  Wifi, 
-  WifiOff, 
   Languages, 
-  UserCheck, 
-  TrendingUp, 
-  CloudRain, 
+  LogOut,
+  User,
+  LayoutDashboard,
+  ChevronDown,
   Sprout,
-  MapPin, 
-  BookOpen, 
+  ShieldCheck,
+  TrendingUp,
+  Leaf,
+  Bug,
+  CloudRain,
+  BookOpen,
+  UserCheck,
   Layers,
-  RefreshCw,
-  Bug
-  , Menu
-  , X, Bell, AlertTriangle
+  MapPin,
+  Menu,
+  X
 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '../context/AuthContext';
-import { AppNotification, loadNotifications, markAllNotificationsRead, markNotificationRead, syncRiskNotifications } from '../utils/notifications';
-import { loadIoTDevices } from '../utils/iotDevices';
-import { dbService } from '../utils/supabase';
+import { profileService } from '../utils/profileService';
 
 interface HeaderProps {
-  role: 'farmer' | 'officer';
+  role?: 'farmer' | 'officer';
   setRole?: (role: 'farmer' | 'officer') => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({ role }) => {
   const { language, setLanguage, t } = useLanguage();
-  const { isOnline, syncQueueLength, triggerSync } = useOffline();
   const pathname = usePathname();
   const router = useRouter();
-  const { signOut } = useAuth();
+  const { user, signOut, role: authRole } = useAuth();
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [notifications, setNotifications] = useState<AppNotification[]>([]);
-  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
 
+  const effectiveRole = authRole || role || 'farmer';
+
+  // Retrieve latest profile info (name, avatar)
+  const profileData = effectiveRole === 'officer'
+    ? profileService.getOfficerProfile(user?.email, user?.user_metadata?.full_name)
+    : profileService.getFarmerProfile(user?.email, user?.user_metadata?.full_name);
+
+  const displayName = profileData.fullName || user?.user_metadata?.full_name || (effectiveRole === 'officer' ? 'Agriculture Officer' : 'Kisan Member');
+  const displayEmail = profileData.email || user?.email || (effectiveRole === 'officer' ? 'admin@krishirakshak.gov.in' : 'farmer@krishirakshak.in');
+  const avatarUrl = profileData.avatarUrl;
+
+  // Close dropdown on outside click or escape key
   useEffect(() => {
-    const audience = role === 'farmer' ? 'farmer' : 'officer';
-    const refresh = async () => {
-      if (audience === 'officer') syncRiskNotifications(loadIoTDevices(), await dbService.getValidationRequests());
-      else syncRiskNotifications(loadIoTDevices());
-      setNotifications(loadNotifications(audience));
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setProfileMenuOpen(false);
+      }
     };
-    const timer = window.setTimeout(refresh, 0);
-    window.addEventListener('storage', refresh);
-    window.addEventListener('krishirakshak-notifications-updated', refresh);
-    const interval = window.setInterval(refresh, 30000);
-    return () => { window.removeEventListener('storage', refresh); window.removeEventListener('krishirakshak-notifications-updated', refresh); window.clearTimeout(timer); window.clearInterval(interval); };
-  }, [role]);
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setProfileMenuOpen(false);
+    };
 
-  const unreadCount = notifications.filter(notification => !notification.read).length;
-  const localizedNotificationTitle = (title: string) => {
-    if (title === 'High pest activity detected') return t('highPestActivity');
-    if (title === 'Environmental risk alert') return t('environmentalRiskAlert');
-    if (title === 'High-risk outbreak signal') return t('highRiskOutbreak');
-    if (title === 'Expert validation required') return t('expertValidationRequired');
-    return title;
-  };
-
-  // Handler for manual sync click
-  const handleSync = async () => {
-    if (isOnline) {
-      await triggerSync();
+    if (profileMenuOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener('keydown', handleKeyDown);
     }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [profileMenuOpen]);
+
+  const handleSignOut = async () => {
+    setProfileMenuOpen(false);
+    setMobileMenuOpen(false);
+    await signOut();
+    router.replace('/login');
   };
 
-  // Farmer tabs: Dashboard, Detect, Surveillance, Forecasting, Environmental Risk, IPM, Profile
-  // Officer tabs: Dashboard, Surveillance & Trends, Map, IPM, Profile
+  const handleLanguageChange = (lang: 'en' | 'hi' | 'bn') => {
+    setLanguage(lang);
+  };
+
+  // Farmer tabs with multi-line formatted labels to prevent navbar overflow
   const farmerTabs = [
-    { name: t('navDashboard'), path: '/dashboard/farmer', icon: TrendingUp },
-    { name: t('navDetect'), path: '/detect', icon: Leaf },
-    { name: t('navSurveillance'), path: '/surveillance', icon: Bug },
-    { name: t('navForecasting'), path: '/forecasting', icon: CloudRain },
-    { name: t('navEnvironmentalRisk'), path: '/environmental-risk', icon: Sprout },
-    { name: t('navIPM'), path: '/ipm', icon: BookOpen },
-    { name: t('navProfile'), path: '/profile', icon: UserCheck },
+    {
+      label: language === 'en' ? 'Farmer\nDashboard' : (language === 'hi' ? 'किसान\nडैशबोर्ड' : 'কৃষক\nড্যাশবোর্ড'),
+      path: '/dashboard/farmer',
+      icon: TrendingUp
+    },
+    {
+      label: language === 'en' ? 'Scan\nDisease & Pest' : (language === 'hi' ? 'रोग व कीट\nस्कैन' : 'রোগ ও বালাই\nস্ক্যান'),
+      path: '/detect',
+      icon: Leaf
+    },
+    {
+      label: language === 'en' ? 'Pest\nSurveillance' : (language === 'hi' ? 'कीट\nनिगरानी' : 'বালাই\nনজরদারি'),
+      path: '/surveillance',
+      icon: Bug
+    },
+    {
+      label: language === 'en' ? 'Risk\nForecast' : (language === 'hi' ? 'जोखिम\nपूर्वानुमान' : 'ঝুঁকি\nপূর্বাভাস'),
+      path: '/forecasting',
+      icon: CloudRain
+    },
+    {
+      label: language === 'en' ? 'Environmental\nRisk' : (language === 'hi' ? 'पर्यावरणीय\nजोखिम' : 'পরিবেশগত\nঝুঁকি'),
+      path: '/environmental-risk',
+      icon: Sprout
+    },
+    {
+      label: language === 'en' ? 'IPM\nGuidelines' : (language === 'hi' ? 'IPM\nदिशानिर्देश' : 'IPM\nনির্দেশিকা'),
+      path: '/ipm',
+      icon: BookOpen
+    },
+    {
+      label: language === 'en' ? 'My\nProfile' : (language === 'hi' ? 'मेरी\nप्रोफ़ाइल' : 'আমার\nপ্রোফাইল'),
+      path: '/profile',
+      icon: UserCheck
+    }
   ];
 
+  // Officer tabs with multi-line formatted labels
   const officerTabs = [
-    { name: t('navDashboard'), path: '/dashboard/officer', icon: Layers },
-    { name: t('navSurveillance'), path: '/surveillance?view=officer', icon: Bug },
-    { name: t('navMap'), path: '/map', icon: MapPin },
-    { name: t('navIPM'), path: '/ipm', icon: BookOpen },
-    { name: t('navProfile'), path: '/profile', icon: UserCheck },
+    {
+      label: language === 'en' ? 'Officer\nDashboard' : (language === 'hi' ? 'अधिकारी\nडैशबोर्ड' : 'কর্মকর্তা\nড্যাশবোর্ড'),
+      path: '/dashboard/officer',
+      icon: Layers
+    },
+    {
+      label: language === 'en' ? 'Pest\nSurveillance' : (language === 'hi' ? 'कीट\nनिगरानी' : 'বালাই\nনজরদারি'),
+      path: '/surveillance?view=officer',
+      icon: Bug
+    },
+    {
+      label: language === 'en' ? 'Outbreak\nMap' : (language === 'hi' ? 'प्रकोप\nमानचित्र' : 'প্রকোপ\nমানচিত্র'),
+      path: '/map',
+      icon: MapPin
+    },
+    {
+      label: language === 'en' ? 'IPM\nGuidelines' : (language === 'hi' ? 'IPM\nदिशानिर्देश' : 'IPM\nনির্দেশিকা'),
+      path: '/ipm',
+      icon: BookOpen
+    },
+    {
+      label: language === 'en' ? 'Officer\nProfile' : (language === 'hi' ? 'अधिकारी\nप्रोफ़ाइल' : 'কর্মকর্তা\nপ্রোফাইল'),
+      path: '/profile',
+      icon: UserCheck
+    }
   ];
 
-  const activeTabs = role === 'farmer' ? farmerTabs : officerTabs;
+  const activeTabs = effectiveRole === 'farmer' ? farmerTabs : officerTabs;
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-slate-800 bg-slate-950/80 backdrop-blur-md">
-      <div className="mx-auto max-w-[1500px] px-4 sm:px-6 lg:px-8">
-        <div className="flex min-h-16 items-center gap-3 py-2">
+    <header className="sticky top-0 z-50 w-full border-b border-slate-800 bg-slate-950/90 backdrop-blur-md">
+      <div className="mx-auto max-w-[1500px] px-3 sm:px-4 lg:px-6">
+        <div className="flex min-h-16 items-center justify-between gap-2 py-1.5">
           
-          {/* Logo */}
-          <div className="flex min-w-[170px] shrink-0 cursor-pointer items-center gap-2" onClick={() => router.push('/')}>
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/95 p-0.5 shadow-lg shadow-green-500/20 ring-1 ring-white/20">
-              <img src="/logo-shield.png" alt="KrishiRakshak AI Logo" className="h-7 w-7 object-contain" />
+          {/* Brand Logo & Title (Fixed shrink-0 so it NEVER hides or gets pushed) */}
+          <Link 
+            href={effectiveRole === 'officer' ? '/dashboard/officer' : '/dashboard/farmer'}
+            className="flex items-center gap-2.5 shrink-0 transition-opacity hover:opacity-90"
+          >
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-tr from-green-500 to-emerald-400 p-1 shadow-lg shadow-green-500/20 ring-1 ring-white/20">
+              <img src="/logo-shield.png" alt="KrishiRakshak AI" className="h-7 w-7 object-contain drop-shadow" />
             </div>
             <div className="min-w-0">
-              <h1 className="flex items-center gap-1.5 whitespace-nowrap text-[17px] font-bold leading-tight tracking-tight text-white">
+              <h1 className="flex items-center gap-1 text-[16px] font-black tracking-tight text-white leading-tight">
                 {t('title')}
               </h1>
-              <p className="whitespace-nowrap text-[10px] font-medium uppercase tracking-wider text-green-400">
-                {role === 'farmer' ? t('farmerPortal') : t('officerPortal')}
+              <p className="text-[10px] font-bold uppercase tracking-wider text-green-400 leading-tight">
+                {effectiveRole === 'farmer' ? t('farmerPortal') : t('officerPortal')}
               </p>
             </div>
-          </div>
+          </Link>
 
-          {/* Navigation Links */}
-          <nav className="hidden min-w-0 items-center justify-around gap-2 overflow-x-auto min-[900px]:flex min-[900px]:basis-[60%] min-[900px]:grow-0 min-[1201px]:basis-auto min-[1201px]:grow min-[1201px]:justify-center min-[1201px]:gap-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {/* Desktop/Tablet Navigation Links (Line-broken labels to prevent overflow) */}
+          <nav className="hidden min-[900px]:flex items-center justify-center gap-1 lg:gap-1.5 flex-1 min-w-0 max-w-[850px] mx-2">
             {activeTabs.map((tab) => {
               const Icon = tab.icon;
-              const isActive = pathname === tab.path || tab.path === '/dashboard/officer' && pathname.startsWith('/dashboard/officer');
+              const isActive = pathname === tab.path || (tab.path.startsWith('/dashboard') && pathname.startsWith(tab.path));
               return (
                 <Link
                   key={tab.path}
                   href={tab.path}
-                  className={`flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg px-2.5 py-2 text-[13px] font-semibold transition-colors ${
+                  className={`flex flex-col items-center justify-center text-center rounded-xl px-2 py-1 min-[1100px]:px-2.5 min-[1100px]:py-1.5 transition-all min-w-[65px] min-[1150px]:min-w-[76px] ${
                     isActive 
-                      ? 'bg-green-950/50 text-green-400 border border-green-800/30' 
-                      : 'text-slate-400 hover:bg-slate-900 hover:text-slate-100'
+                      ? 'bg-green-950/60 text-green-400 border border-green-800/50 shadow-sm shadow-green-500/10' 
+                      : 'text-slate-400 hover:bg-slate-900 hover:text-slate-100 border border-transparent'
                   }`}
                 >
-                  <Icon className="h-5 w-5 min-[1201px]:h-4 min-[1201px]:w-4" />
-                  <span className="hidden min-[1201px]:inline">{tab.name}</span>
+                  <Icon className={`h-4 w-4 shrink-0 mb-0.5 ${isActive ? 'text-green-400' : 'text-slate-400'}`} />
+                  <span className="whitespace-pre-line text-[10px] min-[1150px]:text-[11px] font-bold leading-[1.15]">
+                    {tab.label}
+                  </span>
                 </Link>
               );
             })}
           </nav>
 
-          {/* Controls: Language, Role Switcher, Network Status */}
-          <div className="ml-auto flex shrink-0 items-center gap-1.5">
-            <div className="relative">
-              <button onClick={() => setNotificationsOpen(open => !open)} aria-label="Notifications" className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-800 bg-slate-900 text-slate-300 hover:text-white">
-                <Bell className="h-4 w-4" />
-                {unreadCount > 0 && <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[9px] font-black text-white">{unreadCount > 9 ? '9+' : unreadCount}</span>}
-              </button>
-              {notificationsOpen && <div className="absolute right-0 z-50 mt-2 w-80 max-w-[calc(100vw-2rem)] rounded-xl border border-slate-700 bg-slate-900 p-3 shadow-2xl">
-                <div className="mb-2 flex items-center justify-between border-b border-slate-800 pb-2"><span className="text-xs font-bold text-white">{t('notifications')}</span>{unreadCount > 0 && <button onClick={() => { markAllNotificationsRead(role); setNotifications(loadNotifications(role)); }} className="text-[10px] font-bold text-sky-400">{t('markAllRead')}</button>}</div>
-                {notifications.length === 0 ? <p className="py-5 text-center text-xs text-slate-500">{t('noNotifications')}</p> : <div className="max-h-80 space-y-2 overflow-y-auto">{notifications.slice(0, 8).map(notification => <Link key={notification.id} href={notification.href} onClick={() => { markNotificationRead(notification.id); setNotificationsOpen(false); }} className={`block rounded-lg border p-3 ${notification.read ? 'border-slate-800 bg-slate-950/40' : 'border-amber-800/50 bg-amber-950/20'}`}><div className="flex gap-2"><AlertTriangle className={`mt-0.5 h-4 w-4 shrink-0 ${notification.level === 'critical' ? 'text-rose-400' : 'text-amber-400'}`} /><div><p className="text-xs font-bold text-slate-100">{localizedNotificationTitle(notification.title)}</p><p className="mt-1 text-[11px] leading-relaxed text-slate-400">{notification.message}</p><p className="mt-1 text-[10px] text-slate-600">{new Date(notification.createdAt).toLocaleString()}</p></div></div></Link>)}</div>}
-              </div>}
-            </div>
+          {/* Controls: Profile Menu + Mobile Hamburger */}
+          <div className="flex items-center gap-2 shrink-0">
             
-            {/* Sync trigger if queue has items */}
-            {syncQueueLength > 0 && (
-              <button 
-                onClick={handleSync}
-                disabled={!isOnline}
-                title={isOnline ? "Sync pending offline data" : "Offline - Sync queued"}
-                className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold animate-pulse transition-all ${
-                  isOnline 
-                    ? 'bg-amber-600/20 text-amber-300 border border-amber-500/30 hover:bg-amber-600/30 cursor-pointer' 
-                    : 'bg-slate-800 text-slate-500 border border-slate-700 cursor-not-allowed'
+            {/* Profile Dropdown Menu in Navbar */}
+            <div className="relative" ref={menuRef}>
+              <button
+                onClick={() => setProfileMenuOpen(open => !open)}
+                aria-expanded={profileMenuOpen}
+                aria-haspopup="true"
+                className={`flex items-center gap-2 rounded-2xl border px-2.5 py-1.5 text-xs font-bold transition-all ${
+                  profileMenuOpen
+                    ? 'border-green-500/60 bg-green-950/40 text-green-300 ring-2 ring-green-500/20 shadow-lg shadow-green-500/10'
+                    : 'border-slate-800 bg-slate-900/90 text-slate-200 hover:border-slate-700 hover:bg-slate-800/80 hover:text-white'
                 }`}
               >
-                <RefreshCw className={`h-3 w-3 ${isOnline ? 'animate-spin' : ''}`} />
-                <span className="hidden min-[1201px]:inline">{syncQueueLength} Queue</span>
-              </button>
-            )}
+                {avatarUrl ? (
+                  <img
+                    src={avatarUrl}
+                    alt={displayName}
+                    className="h-7 w-7 rounded-xl object-cover ring-1 ring-green-500/40"
+                  />
+                ) : (
+                  <div className="flex h-7 w-7 items-center justify-center rounded-xl bg-gradient-to-tr from-green-600 to-emerald-500 text-[11px] font-black text-slate-950">
+                    {displayName.substring(0, 2).toUpperCase()}
+                  </div>
+                )}
+                
+                <div className="hidden text-left xl:block">
+                  <p className="max-w-[100px] truncate text-xs font-bold text-white leading-tight">
+                    {displayName}
+                  </p>
+                  <p className="text-[9px] font-semibold text-green-400 capitalize">
+                    {effectiveRole === 'officer' ? 'Officer' : 'Farmer'}
+                  </p>
+                </div>
 
-            {/* Network Status Badge */}
-            <div 
-              className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium border ${
-                isOnline 
-                  ? 'bg-green-950/30 text-green-400 border-green-800/30' 
-                  : 'bg-rose-950/30 text-rose-400 border-rose-800/30'
-              }`}
-            >
-              {isOnline ? (
-                <>
-                  <Wifi className="h-3 w-3 animate-pulse" />
-                  <span className="hidden min-[1201px]:inline">{t('online')}</span>
-                </>
-              ) : (
-                <>
-                  <WifiOff className="h-3 w-3" />
-                  <span className="hidden min-[1201px]:inline">{t('offline')}</span>
-                </>
+                <ChevronDown className={`h-3.5 w-3.5 text-slate-400 transition-transform duration-200 ${profileMenuOpen ? 'rotate-180 text-green-400' : ''}`} />
+              </button>
+
+              {/* Profile Dropdown Menu */}
+              {profileMenuOpen && (
+                <div className="absolute right-0 mt-2.5 w-80 max-w-[calc(100vw-2rem)] origin-top-right rounded-3xl border border-slate-800 bg-slate-900/95 p-4 shadow-2xl backdrop-blur-xl ring-1 ring-white/5 animate-fadeIn z-50 space-y-4">
+                  
+                  {/* User Identity Info Header */}
+                  <div className="flex items-center gap-3 border-b border-slate-800/80 pb-3.5">
+                    {avatarUrl ? (
+                      <img
+                        src={avatarUrl}
+                        alt={displayName}
+                        className="h-12 w-12 rounded-2xl object-cover ring-2 ring-green-500/30 shrink-0"
+                      />
+                    ) : (
+                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-tr from-green-600 to-emerald-500 text-sm font-black text-slate-950 shadow-md">
+                        {displayName.substring(0, 2).toUpperCase()}
+                      </div>
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5">
+                        <h3 className="truncate text-sm font-bold text-white">{displayName}</h3>
+                        {effectiveRole === 'officer' ? (
+                          <ShieldCheck className="h-4 w-4 text-blue-400 shrink-0" />
+                        ) : (
+                          <Sprout className="h-4 w-4 text-green-400 shrink-0" />
+                        )}
+                      </div>
+                      <p className="truncate text-xs text-slate-400 mt-0.5">{displayEmail}</p>
+                      <span className={`inline-block mt-1 rounded-full px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wider ${
+                        effectiveRole === 'officer'
+                          ? 'bg-blue-950/60 text-blue-300 border border-blue-800/40'
+                          : 'bg-green-950/60 text-green-300 border border-green-800/40'
+                      }`}>
+                        {effectiveRole === 'officer' ? 'Official Authority' : 'Registered Farmer'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Navigation Links inside Profile Menu */}
+                  <div className="space-y-1">
+                    <Link
+                      href="/profile"
+                      onClick={() => setProfileMenuOpen(false)}
+                      className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-xs font-bold transition-all ${
+                        pathname === '/profile'
+                          ? 'bg-green-600 text-white shadow-md shadow-green-600/30'
+                          : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                      }`}
+                    >
+                      <User className="h-4 w-4 shrink-0 text-green-400" />
+                      <span>{t('navProfile')}</span>
+                    </Link>
+
+                    <Link
+                      href={effectiveRole === 'officer' ? '/dashboard/officer' : '/dashboard/farmer'}
+                      onClick={() => setProfileMenuOpen(false)}
+                      className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-xs font-bold transition-all ${
+                        pathname.startsWith('/dashboard')
+                          ? 'bg-green-600 text-white shadow-md shadow-green-600/30'
+                          : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                      }`}
+                    >
+                      <LayoutDashboard className="h-4 w-4 shrink-0 text-green-400" />
+                      <span>{effectiveRole === 'officer' ? t('officerPortal') : t('farmerPortal')}</span>
+                    </Link>
+                  </div>
+
+                  {/* Language Selection Option */}
+                  <div className="border-t border-slate-800/80 pt-3 space-y-2">
+                    <div className="flex items-center gap-2 px-1 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                      <Languages className="h-3.5 w-3.5 text-green-400" />
+                      <span>{t('language')}</span>
+                    </div>
+                    <div className="grid grid-cols-3 gap-1.5 bg-slate-950/60 p-1.5 rounded-2xl border border-slate-800/80">
+                      {[
+                        { code: 'en' as const, label: 'English', native: 'EN' },
+                        { code: 'hi' as const, label: 'हिन्दी', native: 'HI' },
+                        { code: 'bn' as const, label: 'বাংলা', native: 'BN' }
+                      ].map(lang => {
+                        const isSelected = language === lang.code;
+                        return (
+                          <button
+                            key={lang.code}
+                            type="button"
+                            onClick={() => handleLanguageChange(lang.code)}
+                            className={`flex flex-col items-center justify-center rounded-xl py-2 px-1 text-xs font-bold transition-all ${
+                              isSelected
+                                ? 'bg-green-600 text-white shadow-md shadow-green-600/30'
+                                : 'text-slate-400 hover:bg-slate-800/70 hover:text-white'
+                            }`}
+                          >
+                            <span className="text-xs">{lang.label}</span>
+                            <span className="text-[9px] opacity-75 font-mono">{lang.native}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Logout Option */}
+                  <div className="border-t border-slate-800/80 pt-3">
+                    <button
+                      type="button"
+                      onClick={handleSignOut}
+                      className="flex w-full items-center justify-center gap-2.5 rounded-xl border border-rose-900/50 bg-rose-950/30 px-4 py-2.5 text-xs font-bold text-rose-300 hover:bg-rose-900/50 hover:text-white hover:border-rose-700 transition-all shadow-sm"
+                    >
+                      <LogOut className="h-4 w-4" />
+                      <span>{t('signOut')}</span>
+                    </button>
+                  </div>
+
+                </div>
               )}
             </div>
 
-            {/* Language Switcher */}
-            <div className="relative group">
-              <button className="flex h-9 items-center gap-1 rounded-lg border border-slate-800 bg-slate-900 px-2.5 py-1.5 text-sm font-medium text-slate-300 hover:bg-slate-800 hover:text-white">
-                <Languages className="h-4 w-4" />
-                <span className="hidden uppercase text-xs font-semibold min-[1201px]:inline">{language}</span>
-              </button>
-              <div className="absolute right-0 mt-1 w-36 max-h-64 overflow-y-auto origin-top-right rounded-lg border border-slate-800 bg-slate-900 p-1 shadow-lg opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-all duration-150 z-50">
-                <button
-                  onClick={() => setLanguage('en')}
-                  className={`w-full rounded-md px-2 py-1 text-left text-xs font-semibold hover:bg-slate-800 hover:text-white ${language === 'en' ? 'text-green-400' : 'text-slate-400'}`}
-                >
-                  English
-                </button>
-                <button
-                  onClick={() => setLanguage('hi')}
-                  className={`w-full rounded-md px-2 py-1 text-left text-xs font-semibold hover:bg-slate-800 hover:text-white ${language === 'hi' ? 'text-green-400' : 'text-slate-400'}`}
-                >
-                  हिन्दी (Hindi)
-                </button>
-                <button
-                  onClick={() => setLanguage('bn')}
-                  className={`w-full rounded-md px-2 py-1 text-left text-xs font-semibold hover:bg-slate-800 hover:text-white ${language === 'bn' ? 'text-green-400' : 'text-slate-400'}`}
-                >
-                  বাংলা (Bengali)
-                </button>
-              </div>
-            </div>
-
-            {/* Profile Link */}
-            <Link
-              href="/profile"
-              title={t('navProfile')}
-              className={`flex h-9 shrink-0 items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-bold transition-all ${
-                pathname === '/profile'
-                  ? 'border-green-500/50 bg-green-950/40 text-green-300 shadow-sm shadow-green-500/20'
-                  : 'border-slate-800 bg-slate-900 text-slate-300 hover:border-slate-700 hover:text-white'
-              }`}
-            >
-              <div className="h-5 w-5 rounded-full bg-gradient-to-tr from-green-500 to-emerald-400 flex items-center justify-center text-[10px] text-slate-950 font-black">
-                {role === 'officer' ? 'AO' : 'KM'}
-              </div>
-              <span className="hidden min-[1201px]:inline">{t('navProfile')}</span>
-            </Link>
-
-            <button onClick={() => signOut().then(() => router.replace('/login'))} title={t('signOut')} className="flex h-9 shrink-0 items-center gap-1.5 rounded-lg border border-slate-700 px-2.5 py-1.5 text-xs font-bold text-slate-300 hover:border-rose-500/50 hover:text-rose-300">
-              <UserCheck className="h-3.5 w-3.5" />
-              <span className="hidden min-[1201px]:inline">{t('signOut')}</span>
-            </button>
-
+            {/* Mobile Hamburger Menu Button */}
             <button
               onClick={() => setMobileMenuOpen(open => !open)}
               aria-label={mobileMenuOpen ? 'Close navigation menu' : 'Open navigation menu'}
               aria-expanded={mobileMenuOpen}
-              className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-700 bg-slate-900 text-slate-300 hover:text-white min-[900px]:hidden"
+              className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-700 bg-slate-900 text-slate-300 hover:text-white min-[900px]:hidden shrink-0"
             >
               {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
             </button>
 
           </div>
+
         </div>
       </div>
 
-      {/* Compact mobile navigation */}
-      {mobileMenuOpen && <div className="hidden max-[899px]:block border-t border-slate-800/80 bg-slate-950/95 p-3 shadow-xl">
-        <nav className="grid gap-1">
-          {activeTabs.map((tab) => {
-            const Icon = tab.icon;
-            const isActive = pathname === tab.path;
-            return <Link key={tab.path} href={tab.path} onClick={() => setMobileMenuOpen(false)} className={`flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-semibold ${isActive ? 'bg-green-950/50 text-green-400' : 'text-slate-300 hover:bg-slate-900'}`}><Icon className="h-4 w-4" />{tab.name}</Link>;
-          })}
-        </nav>
-      </div>}
-
-      <div className="hidden">
-        {activeTabs.map((tab) => {
-          const Icon = tab.icon;
-          const isActive = pathname === tab.path;
-          return (
-            <Link
-              key={tab.path}
-              href={tab.path}
-              className={`flex flex-col items-center gap-1 rounded-md py-1 text-[10px] font-semibold transition-all ${
-                isActive ? 'text-green-400' : 'text-slate-500 hover:text-slate-300'
-              }`}
-            >
-              <Icon className="h-4.5 w-4.5" />
-              <span>{tab.name}</span>
-            </Link>
-          );
-        })}
-      </div>
+      {/* Mobile Drawer Menu (< 900px) */}
+      {mobileMenuOpen && (
+        <div className="min-[900px]:hidden border-t border-slate-800 bg-slate-950/95 p-4 shadow-2xl backdrop-blur-xl animate-fadeIn">
+          <nav className="grid grid-cols-2 gap-2">
+            {activeTabs.map((tab) => {
+              const Icon = tab.icon;
+              const isActive = pathname === tab.path || (tab.path.startsWith('/dashboard') && pathname.startsWith(tab.path));
+              return (
+                <Link
+                  key={tab.path}
+                  href={tab.path}
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={`flex items-center gap-2.5 rounded-xl p-3 text-xs font-bold transition-all ${
+                    isActive 
+                      ? 'bg-green-600 text-white shadow-md shadow-green-600/30' 
+                      : 'bg-slate-900/80 text-slate-300 hover:bg-slate-800 hover:text-white'
+                  }`}
+                >
+                  <Icon className="h-4 w-4 shrink-0" />
+                  <span className="whitespace-pre-line leading-tight">
+                    {tab.label}
+                  </span>
+                </Link>
+              );
+            })}
+          </nav>
+        </div>
+      )}
     </header>
   );
 };
