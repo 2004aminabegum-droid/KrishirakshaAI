@@ -5,6 +5,7 @@ import { useLanguage } from '../../../context/LanguageContext';
 import { useOffline } from '../../../context/OfflineContext';
 import { Header } from '../../../components/Header';
 import { dbService, ValidationRequest, HotspotRecord } from '../../../utils/supabase';
+import { formatConfidencePercent } from '../../../utils/db';
 import { 
   ShieldAlert, 
   Map, 
@@ -258,7 +259,7 @@ export default function OfficerDashboard() {
                                     <span>{new Date(req.created_at).toLocaleDateString()}</span>
                                   </div>
                                   <div>
-                                    Confidence: <span className="text-amber-400">{Math.round(req.confidence * 100)}%</span>
+                                    Confidence: <span className="text-amber-400">{formatConfidencePercent(req.confidence)}%</span>
                                   </div>
                                 </div>
                               </div>

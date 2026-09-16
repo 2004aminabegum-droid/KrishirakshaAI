@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { formatConfidencePercent } from './db';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
@@ -157,7 +158,7 @@ export const dbService = {
             id: `h_auto_${Date.now()}`,
             crop: req.crop,
             disease: verdict,
-            severity: req.confidence < 0.6 ? 'high' : 'medium',
+            severity: formatConfidencePercent(req.confidence) < 60 ? 'high' : 'medium',
             latitude: 22.4 + Math.random() * 0.8,
             longitude: 88.0 + Math.random() * 0.6,
             village: req.farmer_location || 'Unknown Village',

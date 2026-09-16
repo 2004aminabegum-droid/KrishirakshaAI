@@ -2,6 +2,7 @@
 
 import React, { useRef, useEffect } from 'react';
 import { DetectedPest } from '../utils/hybridEngine';
+import { formatConfidencePercent } from '../utils/db';
 
 interface PestBoundingBoxProps {
   imageSrc: string;
@@ -39,7 +40,7 @@ export function PestBoundingBox({ imageSrc, pests }: PestBoundingBoxProps) {
           ctx.strokeRect(x, y, w, h);
 
           // Background box for label
-          const labelText = `${pest.name} (${Math.round(pest.confidence * 100)}%)`;
+          const labelText = `${pest.name} (${formatConfidencePercent(pest.confidence)}%)`;
           ctx.font = `bold ${Math.max(12, Math.round(img.width / 40))}px sans-serif`;
           const textWidth = ctx.measureText(labelText).width;
           const textHeight = Math.max(16, Math.round(img.width / 35));

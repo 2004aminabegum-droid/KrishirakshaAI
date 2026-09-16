@@ -5,6 +5,7 @@ import { useLanguage } from '../../context/LanguageContext';
 import { useOffline } from '../../context/OfflineContext';
 import { Header } from '../../components/Header';
 import { dbService, ValidationRequest } from '../../utils/supabase';
+import { formatConfidencePercent } from '../../utils/db';
 import {
   Bug,
   Activity,
@@ -420,7 +421,7 @@ export default function SurveillancePage() {
 
             <section className="glass-card border border-slate-800 p-6">
               <div className="flex items-center justify-between gap-3 mb-5"><div><h2 className="text-lg font-bold text-white">Suspected pest images</h2><p className="text-xs text-slate-500 mt-1">Pending farmer submissions requiring review.</p></div><span className="rounded-full bg-amber-500/10 px-3 py-1 text-xs font-bold text-amber-300">{suspectedPestImages.length}</span></div>
-              {suspectedPestImages.length === 0 ? <p className="py-8 text-sm text-slate-500">No suspected pest images awaiting review.</p> : <div className="space-y-3">{suspectedPestImages.map(request => <Link key={request.id} href="/dashboard/officer" className="block rounded-xl border border-slate-800 bg-slate-950/60 p-4 hover:border-amber-700/60"><div className="flex items-start gap-3"><img src={request.image} alt={request.crop} className="h-14 w-14 rounded-lg object-cover" /><div className="min-w-0"><p className="font-bold text-white truncate">{request.original_diagnosis}</p><p className="text-xs text-slate-400 mt-1">{request.crop} · {request.farmer_location}</p><p className="text-[10px] text-amber-400 mt-2">Confidence {Math.round(request.confidence * 100)}% · Review now</p></div></div></Link>)}</div>}
+              {suspectedPestImages.length === 0 ? <p className="py-8 text-sm text-slate-500">No suspected pest images awaiting review.</p> : <div className="space-y-3">{suspectedPestImages.map(request => <Link key={request.id} href="/dashboard/officer" className="block rounded-xl border border-slate-800 bg-slate-950/60 p-4 hover:border-amber-700/60"><div className="flex items-start gap-3"><img src={request.image} alt={request.crop} className="h-14 w-14 rounded-lg object-cover" /><div className="min-w-0"><p className="font-bold text-white truncate">{request.original_diagnosis}</p><p className="text-xs text-slate-400 mt-1">{request.crop} · {request.farmer_location}</p><p className="text-[10px] text-amber-400 mt-2">Confidence {formatConfidencePercent(request.confidence)}% · Review now</p></div></div></Link>)}</div>}
             </section>
           </div>
         </main>
