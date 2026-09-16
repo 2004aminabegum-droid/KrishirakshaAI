@@ -26,6 +26,24 @@ export interface SyncItem {
   timestamp: number;
 }
 
+/**
+ * Normalizes confidence values into a clean percentage integer (0 - 100).
+ * Handles:
+ * - Ratios: 0.0 - 1.0 (e.g. 0.72 -> 72)
+ * - Standard percentages: 1 - 100 (e.g. 72 -> 72)
+ * - Over-multiplied values: > 100 (e.g. 7200 -> 72)
+ */
+export function formatConfidencePercent(val: number | undefined | null): number {
+  if (typeof val !== 'number' || isNaN(val)) return 0;
+  let pct = val;
+  if (pct > 100) {
+    pct = pct / 100;
+  } else if (pct <= 1 && pct > 0) {
+    pct = pct * 100;
+  }
+  return Math.max(0, Math.min(100, Math.round(pct)));
+}
+
 class IndexedDBService {
   private db: IDBDatabase | null = null;
 
@@ -82,8 +100,12 @@ class IndexedDBService {
       const request = store.getAll();
 
       request.onsuccess = () => {
-        // Sort scans by date descending (latest first)
-        const sorted = (request.result as ScanRecord[]).sort(
+        // Sort scans by date descending (latest first) and normalize confidence
+        const rawScans = (request.result as ScanRecord[]) || [];
+        const sorted = rawScans.map(scan => ({
+          ...scan,
+          confidence: formatConfidencePercent(scan.confidence)
+        })).sort(
           (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
         );
         resolve(sorted);
@@ -97,7 +119,11 @@ class IndexedDBService {
     return new Promise((resolve, reject) => {
       const transaction = db.transaction('scans', 'readwrite');
       const store = transaction.objectStore('scans');
-      const request = store.put(scan);
+      const normalizedScan = {
+        ...scan,
+        confidence: formatConfidencePercent(scan.confidence)
+      };
+      const request = store.put(normalizedScan);
 
       request.onsuccess = () => resolve();
       request.onerror = () => reject(request.error);

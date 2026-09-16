@@ -11,7 +11,7 @@ import {
   OfficerProfileData,
   FarmPlot
 } from '../../utils/profileService';
-import { localDB, ScanRecord } from '../../utils/db';
+import { localDB, ScanRecord, formatConfidencePercent } from '../../utils/db';
 import { dbService, ValidationRequest, HotspotRecord } from '../../utils/supabase';
 import { loadIoTDevices, IoTDevice } from '../../utils/iotDevices';
 import { addNotification } from '../../utils/notifications';
@@ -1012,7 +1012,7 @@ export default function ProfilePage() {
                               <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
                                 scan.accuracyStatus === 'high' ? 'bg-green-950 text-green-300 border border-green-800/40' : 'bg-amber-950 text-amber-300 border border-amber-800/40'
                               }`}>
-                                {Math.round(scan.confidence * 100)}% Confidence
+                                {formatConfidencePercent(scan.confidence)}% Confidence
                               </span>
                             </div>
                           </div>

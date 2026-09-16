@@ -4,7 +4,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { useLanguage } from '../../../context/LanguageContext';
 import { useOffline } from '../../../context/OfflineContext';
 import { Header } from '../../../components/Header';
-import { localDB, ScanRecord } from '../../../utils/db';
+import { localDB, ScanRecord, formatConfidencePercent } from '../../../utils/db';
 import {
   Thermometer,
   Droplets,
@@ -833,7 +833,7 @@ export default function FarmerDashboard() {
                         <p className="text-[11px] font-bold text-white truncate">{scan.crop} · {scan.diagnosis.slice(0, 28)}...</p>
                         <p className="text-[10px] text-slate-400 flex items-center gap-1.5 mt-0.5">
                           <span>{new Date(scan.date).toLocaleDateString()}</span>
-                          <span className={scan.confidence > 0.75 ? 'text-green-400' : 'text-amber-400'}>{Math.round(scan.confidence * 100)}%</span>
+                          <span className={formatConfidencePercent(scan.confidence) >= 75 ? 'text-green-400' : 'text-amber-400'}>{formatConfidencePercent(scan.confidence)}%</span>
                         </p>
                       </div>
                       {scan.validationRequested && (

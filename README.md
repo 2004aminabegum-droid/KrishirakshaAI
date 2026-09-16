@@ -267,7 +267,6 @@ KrishiRakshak AI features end-to-end Python pipelines for dataset preprocessing,
 | `build_kisanvaani_rag_kb.py` | Ingests the full 22,615 Q&A pairs from `KisanVaani/agriculture-qa-english-only`, cleans unicode, categorizes across 10 agronomic domains, and compiles `public/kisanvaani_rag_kb.json` (9.36 MB) + `training_output/krishibani_llm_finetune_22k.jsonl` (12.32 MB). |
 | `train_krishibani_llm.py` | Fine-tunes open-source LLMs (Qwen2.5, LLaMA-3.2, TinyLlama, Mistral) on the 22,615 KrishiBani ChatML dataset using Hugging Face & PEFT LoRA / QLoRA. |
 | `train_hybrid_models.py` | Trains multi-crop leaf pathogen classifiers using PyTorch & MobileNetV3; exports to `public/model.onnx`. |
-| `train_dlcpd25_pest_model.py` | Trains 25-class agricultural insect pest model checkpoints. |
 | `evaluate_metrics.py` | Calculates test-set Precision, Recall, F1-score, and ROC-AUC curves. |
 
 ### 🌾 KisanVaani 22k RAG & LLM Fine-Tuning Pipeline
