@@ -154,14 +154,16 @@ export const Header: React.FC<HeaderProps> = ({ role }) => {
   const activeTabs = effectiveRole === 'farmer' ? farmerTabs : officerTabs;
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-slate-800 bg-slate-950/90 backdrop-blur-md">
+    <>
+      <header className="sticky top-0 z-50 w-full border-b border-slate-800 bg-slate-950/90 backdrop-blur-md">
       <div className="mx-auto max-w-[1500px] px-3 sm:px-4 lg:px-6">
         <div className="flex min-h-16 items-center justify-between gap-2 py-1.5">
           
-          {/* Brand Logo & Title (Fixed shrink-0 so it NEVER hides or gets pushed) */}
+          {/* Brand Logo & Title (Navigates to Home / route) */}
           <Link 
-            href={effectiveRole === 'officer' ? '/dashboard/officer' : '/dashboard/farmer'}
-            className="flex items-center gap-2.5 shrink-0 transition-opacity hover:opacity-90"
+            href="/"
+            className="flex items-center gap-2.5 shrink-0 transition-opacity hover:opacity-90 cursor-pointer"
+            title="Go to Home"
           >
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-tr from-green-500 to-emerald-400 p-1 shadow-lg shadow-green-500/20 ring-1 ring-white/20">
               <img src="/logo-shield.png" alt="KrishiRakshak AI" className="h-7 w-7 object-contain drop-shadow" />
@@ -176,24 +178,29 @@ export const Header: React.FC<HeaderProps> = ({ role }) => {
             </div>
           </Link>
 
-          {/* Desktop/Tablet Navigation Links (Line-broken labels to prevent overflow) */}
-          <nav className="hidden min-[900px]:flex items-center justify-center gap-1 lg:gap-1.5 flex-1 min-w-0 max-w-[850px] mx-2">
+          {/* Tablet & Desktop Top Navigation Links - Logo / Icon Only */}
+          <nav className="hidden md:flex items-center justify-center gap-1 sm:gap-1.5 flex-1 min-w-0 max-w-[750px] mx-2">
             {activeTabs.map((tab) => {
               const Icon = tab.icon;
               const isActive = pathname === tab.path || (tab.path.startsWith('/dashboard') && pathname.startsWith(tab.path));
+              const cleanTitle = tab.label.replace('\n', ' ');
               return (
                 <Link
                   key={tab.path}
                   href={tab.path}
-                  className={`flex flex-col items-center justify-center text-center rounded-xl px-2 py-1 min-[1100px]:px-2.5 min-[1100px]:py-1.5 transition-all min-w-[65px] min-[1150px]:min-w-[76px] ${
+                  title={cleanTitle}
+                  aria-label={cleanTitle}
+                  className={`group relative flex items-center justify-center rounded-xl p-2 sm:p-2.5 transition-all ${
                     isActive 
                       ? 'bg-green-950/60 text-green-400 border border-green-800/50 shadow-sm shadow-green-500/10' 
-                      : 'text-slate-400 hover:bg-slate-900 hover:text-slate-100 border border-transparent'
+                      : 'text-slate-400 hover:bg-slate-900 hover:text-slate-100 border border-transparent hover:border-slate-800'
                   }`}
                 >
-                  <Icon className={`h-4 w-4 shrink-0 mb-0.5 ${isActive ? 'text-green-400' : 'text-slate-400'}`} />
-                  <span className="whitespace-pre-line text-[10px] min-[1150px]:text-[11px] font-bold leading-[1.15]">
-                    {tab.label}
+                  <Icon className={`h-5 w-5 shrink-0 ${isActive ? 'text-green-400 stroke-[2.2]' : 'text-slate-400 stroke-[1.8]'}`} />
+                  
+                  {/* Tooltip on hover */}
+                  <span className="pointer-events-none absolute -bottom-8 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-50 whitespace-nowrap rounded-lg bg-slate-900 px-2 py-0.5 text-[10px] font-bold text-white shadow-md border border-slate-800">
+                    {cleanTitle}
                   </span>
                 </Link>
               );
@@ -353,49 +360,43 @@ export const Header: React.FC<HeaderProps> = ({ role }) => {
               )}
             </div>
 
-            {/* Mobile Hamburger Menu Button */}
-            <button
-              onClick={() => setMobileMenuOpen(open => !open)}
-              aria-label={mobileMenuOpen ? 'Close navigation menu' : 'Open navigation menu'}
-              aria-expanded={mobileMenuOpen}
-              className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-700 bg-slate-900 text-slate-300 hover:text-white min-[900px]:hidden shrink-0"
-            >
-              {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-            </button>
-
           </div>
 
         </div>
       </div>
-
-      {/* Mobile Drawer Menu (< 900px) */}
-      {mobileMenuOpen && (
-        <div className="min-[900px]:hidden border-t border-slate-800 bg-slate-950/95 p-4 shadow-2xl backdrop-blur-xl animate-fadeIn">
-          <nav className="grid grid-cols-2 gap-2">
-            {activeTabs.map((tab) => {
-              const Icon = tab.icon;
-              const isActive = pathname === tab.path || (tab.path.startsWith('/dashboard') && pathname.startsWith(tab.path));
-              return (
-                <Link
-                  key={tab.path}
-                  href={tab.path}
-                  onClick={() => setMobileMenuOpen(false)}
-                  className={`flex items-center gap-2.5 rounded-xl p-3 text-xs font-bold transition-all ${
-                    isActive 
-                      ? 'bg-green-600 text-white shadow-md shadow-green-600/30' 
-                      : 'bg-slate-900/80 text-slate-300 hover:bg-slate-800 hover:text-white'
-                  }`}
-                >
-                  <Icon className="h-4 w-4 shrink-0" />
-                  <span className="whitespace-pre-line leading-tight">
-                    {tab.label}
-                  </span>
-                </Link>
-              );
-            })}
-          </nav>
-        </div>
-      )}
     </header>
+
+    {/* 📱 Mobile Fixed Bottom Navigation Bar (< md) - Logo/Icon Only like 2nd image */}
+    <nav 
+      className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-slate-950/95 backdrop-blur-md border-t border-slate-800 px-1.5 py-2 shadow-[0_-4px_20px_rgba(0,0,0,0.06)]"
+      aria-label="Mobile Navigation"
+    >
+      <div className="flex items-center justify-around max-w-md mx-auto">
+        {activeTabs.map((tab) => {
+          const Icon = tab.icon;
+          const isActive = pathname === tab.path || (tab.path.startsWith('/dashboard') && pathname.startsWith(tab.path));
+          const cleanTitle = tab.label.replace('\n', ' ');
+          return (
+            <Link
+              key={tab.path}
+              href={tab.path}
+              title={cleanTitle}
+              aria-label={cleanTitle}
+              className={`relative flex flex-col items-center justify-center p-2 rounded-xl transition-all ${
+                isActive
+                  ? 'bg-green-950/60 text-green-400 scale-105 shadow-sm'
+                  : 'text-slate-400 hover:bg-slate-900 hover:text-slate-100'
+              }`}
+            >
+              <Icon className={`h-5 w-5 ${isActive ? 'text-green-400 stroke-[2.2]' : 'text-slate-400 stroke-[1.8]'}`} />
+              {isActive && (
+                <span className="absolute -bottom-0.5 h-1 w-1 rounded-full bg-green-400" />
+              )}
+            </Link>
+          );
+        })}
+      </div>
+    </nav>
+  </>
   );
 };
