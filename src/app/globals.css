@@ -1,15 +1,94 @@
 @import "tailwindcss";
 
+@theme {
+  /* Warm cream/beige canvas background to crisp white card surfaces */
+  --color-slate-950: #F5F2E9; /* Warm organic cream page canvas */
+  --color-slate-900: #FFFFFF; /* Clean elevated crisp white card surface */
+  --color-slate-850: #FAF8F4; /* Ultra-light surface tint */
+  --color-slate-800: #E6DFD1; /* Warm subtle card border & divider */
+  --color-slate-700: #D8D0C0; /* Input borders and interactive outlines */
+  --color-slate-600: #8C998E; /* Subtle caption and placeholder text */
+  --color-slate-500: #718073; /* Inactive navigation, muted meta */
+  --color-slate-400: #566459; /* Secondary labels & subtitles (e.g. Bardhaman, Paddy) */
+  --color-slate-300: #3E4B41; /* Secondary body text */
+  --color-slate-200: #27332A; /* Primary body text */
+  --color-slate-100: #1A221C; /* Main titles and bold values (e.g. Namaste, Ramu ji) */
+  --color-slate-50: #101612;  /* Deepest contrast headers */
+
+  /* Deep Agricultural Forest Green Palette */
+  --color-green-950: #E4EFE6; /* Light sage badge/pill background */
+  --color-green-900: #CFE0D3; /* Soft sage container border */
+  --color-green-800: #1B4229; /* Darkest forest shade */
+  --color-green-700: #1E4B2F; /* Deep forest hover */
+  --color-green-600: #235334; /* Primary Forest Green (Action buttons & active states) */
+  --color-green-500: #2A633F; /* Secondary forest accent */
+  --color-green-400: #235334; /* Icons & key accents (replaces dark neon green) */
+  --color-green-300: #1B4229; /* Text on light sage pills */
+  --color-green-200: #357B4E; 
+  --color-green-100: #EBF3EC; /* Ultra-light sage tint */
+  --color-green-50: #F4F8F4;
+
+  /* Harmonize Emerald with Forest Green */
+  --color-emerald-950: #E4EFE6;
+  --color-emerald-900: #CFE0D3;
+  --color-emerald-800: #1B4229;
+  --color-emerald-700: #1E4B2F;
+  --color-emerald-600: #235334;
+  --color-emerald-500: #2A633F;
+  --color-emerald-400: #235334;
+  --color-emerald-300: #1B4229;
+  --color-emerald-200: #357B4E;
+  --color-emerald-100: #EBF3EC;
+  --color-emerald-50: #F4F8F4;
+
+  /* Warm Harvest Amber & Risk Badges */
+  --color-amber-950: #FBF4E6;
+  --color-amber-900: #F5E8CB; /* 'Moderate' pill background */
+  --color-amber-800: #7A4B13; /* 'Moderate' pill text */
+  --color-amber-700: #8C5818;
+  --color-amber-600: #C2831F;
+  --color-amber-500: #DDA326; /* Golden shield icon */
+  --color-amber-400: #E5A823;
+  --color-amber-300: #7A4B13;
+  --color-amber-200: #713F12; /* High contrast readable text */
+  --color-amber-100: #451A03;
+
+  /* Sky & Info Badges / Banners */
+  --color-sky-950: #EDF6FC; /* Soft info background */
+  --color-sky-900: #D7ECF9;
+  --color-sky-800: #60A5FA;
+  --color-sky-700: #0369A1;
+  --color-sky-600: #0284C7;
+  --color-sky-500: #0284C7;
+  --color-sky-400: #0369A1;
+  --color-sky-300: #075985;
+  --color-sky-200: #0C4A6E; /* High contrast dark text for info banners */
+  --color-sky-100: #082F49;
+  --color-sky-50: #F0F9FF;
+
+  /* Rose & Alert States */
+  --color-rose-950: #FEF2F2;
+  --color-rose-900: #FEE2E2;
+  --color-rose-800: #991B1B;
+  --color-rose-700: #B91C1C;
+  --color-rose-600: #DC2626;
+  --color-rose-500: #EF4444;
+  --color-rose-400: #B91C1C;
+  --color-rose-300: #991B1B;
+  --color-rose-200: #7F1D1D; /* High contrast red text */
+  --color-rose-100: #450A0A;
+}
+
 :root {
-  --background: #020617; /* Slate-950 default */
-  --foreground: #f8fafc; /* Slate-50 default */
+  --background: #F5F2E9; /* Warm cream linen canvas */
+  --foreground: #1A221C; /* Deep charcoal text */
   
-  --primary-glow: radial-gradient(rgba(21, 128, 61, 0.15), rgba(2, 6, 23, 0));
+  --primary-glow: radial-gradient(rgba(35, 83, 52, 0.08), rgba(245, 242, 233, 0));
   --secondary-glow: linear-gradient(
     to bottom right,
-    rgba(22, 163, 74, 0),
-    rgba(22, 163, 74, 0),
-    rgba(22, 163, 74, 0.2)
+    rgba(35, 83, 52, 0),
+    rgba(35, 83, 52, 0),
+    rgba(35, 83, 52, 0.04)
   );
 }
 
@@ -25,49 +104,51 @@ body {
   color: var(--foreground);
   font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
   overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
 }
 
 /* Premium Scrollbars */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 7px;
+  height: 7px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #090d16;
+  background: #EFE9DD;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #1e293b;
+  background: #CDC5B4;
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #22c55e;
+  background: #235334;
 }
 
-/* Glassmorphism Styles */
+/* Glassmorphism Styles for Light Theme */
 .glass-card {
-  background: rgba(15, 23, 42, 0.55);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid #E6DFD1;
+  border-radius: 1.25rem;
+  box-shadow: 0 2px 8px -2px rgba(35, 83, 52, 0.04), 0 1px 3px 0 rgba(0, 0, 0, 0.02);
 }
 
 .glass-card-hover {
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .glass-card-hover:hover {
-  background: rgba(15, 23, 42, 0.7);
-  border-color: rgba(34, 197, 94, 0.3);
+  background: #FFFFFF;
+  border-color: rgba(35, 83, 52, 0.3);
   transform: translateY(-2px);
-  box-shadow: 0 10px 25px -5px rgba(22, 163, 74, 0.1),
-              0 8px 10px -6px rgba(22, 163, 74, 0.1);
+  box-shadow: 0 12px 28px -6px rgba(35, 83, 52, 0.10),
+              0 6px 12px -4px rgba(35, 83, 52, 0.04);
 }
 
-/* Ambient glow effects */
+/* Ambient subtle glow effects */
 .glow-card {
   position: relative;
 }
@@ -82,27 +163,93 @@ body {
   border-radius: inherit;
   background: var(--secondary-glow);
   pointer-events: none;
-  opacity: 0.8;
+  opacity: 0.6;
   z-index: -1;
 }
 
-/* Text Gradients */
+/* Refined Text Gradients */
 .text-gradient-green {
-  background: linear-gradient(135deg, #4ade80 0%, #22c55e 50%, #15803d 100%);
+  background: linear-gradient(135deg, #1A442A 0%, #235334 50%, #2D6942 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
 .text-gradient-gold {
-  background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 50%, #d97706 100%);
+  background: linear-gradient(135deg, #A86A14 0%, #C2831F 50%, #84500D 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
 .text-gradient-sky {
-  background: linear-gradient(135deg, #38bdf8 0%, #0ea5e9 50%, #0369a1 100%);
+  background: linear-gradient(135deg, #0284C7 0%, #0369A1 50%, #075985 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
+}
+
+/* Text-white readability handling on light cards */
+.text-white {
+  color: #1A221C;
+}
+
+/* Keep pure white text on dark buttons, dark badges, dark pills, and dark hero banners */
+button.text-white,
+button .text-white,
+[class*="bg-green-600"] .text-white,
+[class*="bg-green-700"] .text-white,
+[class*="bg-green-800"] .text-white,
+[class*="bg-emerald-600"] .text-white,
+[class*="bg-emerald-700"] .text-white,
+[class*="bg-emerald-800"] .text-white,
+[class*="bg-rose-600"] .text-white,
+[class*="bg-rose-700"] .text-white,
+[class*="bg-red-600"] .text-white,
+[class*="bg-blue-600"] .text-white,
+[class*="bg-indigo-600"] .text-white,
+[class*="from-green-600"] .text-white,
+[class*="from-emerald-600"] .text-white,
+.text-always-white {
+  color: #FFFFFF !important;
+}
+
+/* Buttons and Links that have bg-green-600 or bg-emerald-600 with direct text */
+button[class*="bg-green-600"],
+button[class*="bg-emerald-600"],
+button[class*="from-green-600"],
+a[class*="bg-green-600"],
+a[class*="bg-emerald-600"],
+a[class*="from-green-600"] {
+  color: #FFFFFF !important;
+}
+
+/* Hero banners with dark forest green styling */
+.dark-forest-banner {
+  background-color: #235334 !important;
+  color: #FFFFFF !important;
+}
+
+.dark-forest-banner * {
+  color: #FFFFFF;
+}
+
+.dark-forest-banner .text-slate-400 {
+  color: #D3E2D6 !important;
+}
+
+/* Form inputs styling */
+input:not([type="checkbox"]):not([type="radio"]),
+select,
+textarea {
+  background-color: #FFFFFF !important;
+  color: #1A221C !important;
+  border-color: #D8D0C0 !important;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: #235334 !important;
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(35, 83, 52, 0.15) !important;
 }
 
 /* Interactive Outbreak Ripple */
@@ -122,4 +269,5 @@ body {
   border-radius: 50%;
   animation: ripple 2s infinite ease-out;
 }
+
 
