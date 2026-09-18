@@ -1,21 +1,21 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useLanguage } from '../context/LanguageContext';
-import { 
-  Leaf, 
-  User, 
-  ShieldAlert, 
-  Languages, 
-  ArrowRight, 
-  Scan, 
-  Bug, 
-  CloudSun, 
-  MapPin, 
-  TrendingUp, 
-  ShieldCheck, 
-  BookOpen, 
+import {
+  Leaf,
+  User,
+  ShieldAlert,
+  Languages,
+  ArrowRight,
+  Scan,
+  Bug,
+  CloudSun,
+  MapPin,
+  TrendingUp,
+  ShieldCheck,
+  BookOpen,
   Database,
   Sparkles,
   Activity,
@@ -24,6 +24,8 @@ import {
   X,
   ExternalLink,
   ChevronRight,
+  ChevronDown,
+  Check,
   CheckCircle2,
   Zap,
   Info,
@@ -53,6 +55,8 @@ export default function Home() {
   const [activeCategory, setActiveCategory] = useState<string>('All');
   const [scrolled, setScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [langDropdownOpen, setLangDropdownOpen] = useState(false);
+  const langMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -61,6 +65,27 @@ export default function Home() {
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
+
+  // Close language dropdown on outside click or escape
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (langMenuRef.current && !langMenuRef.current.contains(event.target as Node)) {
+        setLangDropdownOpen(false);
+      }
+    };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setLangDropdownOpen(false);
+    };
+
+    if (langDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener('keydown', handleKeyDown);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [langDropdownOpen]);
 
   const selectRoleAndNavigate = (role: 'farmer' | 'officer', targetRoute?: string) => {
     const destination = targetRoute || (role === 'farmer' ? '/dashboard/farmer' : '/dashboard/officer');
@@ -242,12 +267,12 @@ export default function Home() {
     forecasting: { title: 'আবহাওয়া-ভিত্তিক রোগ ঝুঁকি পূর্বাভাস', shortDesc: 'মাইক্রো-ক্লাইমেট সেন্সর ও আঞ্চলিক আবহাওয়া ডেটা দিয়ে ৫ দিনের প্রকোপ পূর্বাভাস।' }
   } : {};
   const filteredFeatures = activeCategory === 'All'
-    ? features 
+    ? features
     : features.filter(f => f.category === activeCategory);
 
   return (
     <div className="relative min-h-screen flex flex-col bg-slate-950 text-slate-100 selection:bg-green-500 selection:text-slate-950 font-sans overflow-x-hidden">
-      
+
       {/* Dynamic Ambient Background Glows */}
       <div className="fixed top-[-15%] left-[-10%] w-[55%] h-[55%] rounded-full bg-green-900/15 blur-[140px] pointer-events-none z-0" />
       <div className="fixed bottom-[-15%] right-[-10%] w-[55%] h-[55%] rounded-full bg-emerald-950/25 blur-[140px] pointer-events-none z-0" />
@@ -256,7 +281,7 @@ export default function Home() {
       {/* Glassmorphic Sticky Header */}
       <header className={`sticky top-0 z-[60] w-full border-b transition-all duration-300 ${scrolled ? 'bg-slate-950/95 backdrop-blur-md border-slate-800/80 shadow-2xl py-3' : 'bg-slate-950/90 backdrop-blur-md border-slate-800/50 py-5'}`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between">
-          
+
           {/* Logo & Brand */}
           <div className="flex items-center gap-3 cursor-pointer" onClick={() => router.push('/')}>
             <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/95 p-1 shadow-lg shadow-green-500/25 ring-1 ring-white/20">
@@ -279,26 +304,74 @@ export default function Home() {
             <a href="#stats" className="hover:text-green-400 transition-colors">Performance</a>
           </nav>
 
-          {/* Language Switcher & CTA */}
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-1 border border-slate-800 bg-slate-900/80 backdrop-blur-md rounded-xl p-1 shadow-inner">
-              <Languages className="h-4 w-4 text-slate-400 ml-2 mr-1" />
-              {(['en', 'hi', 'bn'] as const).map((langKey) => (
-                <button
-                  key={langKey}
-                  onClick={() => setLanguage(langKey)}
-                  className={`rounded-lg px-2.5 py-1 text-xs font-extrabold transition-all duration-200 ${
-                    language === langKey 
-                      ? 'bg-gradient-to-r from-green-600 to-emerald-600 text-white shadow-md shadow-green-600/30' 
-                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
-                  }`}
-                >
-                  {langKey === 'en' ? 'EN' : langKey === 'hi' ? 'हिंदी' : 'বাংলা'}
-                </button>
-              ))}
+          {/* Single Compact Language Dropdown Selector */}
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className="relative" ref={langMenuRef}>
+              <button
+                type="button"
+                onClick={() => setLangDropdownOpen(open => !open)}
+                aria-expanded={langDropdownOpen}
+                aria-haspopup="true"
+                className={`flex items-center gap-1.5 sm:gap-2 rounded-2xl border px-2.5 sm:px-3 py-1.5 text-xs font-bold transition-all ${
+                  langDropdownOpen
+                    ? 'border-green-500/60 bg-green-950/40 text-green-400 ring-2 ring-green-500/20 shadow-lg shadow-green-500/10'
+                    : 'border-slate-800 bg-slate-900/90 text-slate-100 hover:border-slate-700 hover:bg-slate-800/80 shadow-sm'
+                }`}
+                title="Select Language"
+              >
+                <Languages className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-green-600 shrink-0" />
+                <span className="font-extrabold text-xs">
+                  {language === 'en' ? 'English' : language === 'hi' ? 'हिन्दी' : 'বাংলা'}
+                </span>
+                <span className="text-[10px] uppercase font-mono px-1.5 py-0.5 rounded bg-green-950/60 text-green-400 font-extrabold">
+                  {language.toUpperCase()}
+                </span>
+                <ChevronDown className={`h-3 w-3 sm:h-3.5 sm:w-3.5 text-slate-400 transition-transform duration-200 ${langDropdownOpen ? 'rotate-180 text-green-400' : ''}`} />
+              </button>
+
+              {/* Language Dropdown Menu */}
+              {langDropdownOpen && (
+                <div className="absolute right-0 mt-2 w-48 sm:w-56 origin-top-right rounded-2xl border border-slate-800 bg-slate-900/95 p-1.5 sm:p-2 shadow-2xl backdrop-blur-xl ring-1 ring-black/5 animate-fadeIn z-[70] space-y-1">
+                  <div className="px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wider text-slate-400 border-b border-slate-800/80 mb-1">
+                    Select Language / भाषा
+                  </div>
+                  {[
+                    { code: 'en' as const, label: 'English', native: 'EN', desc: 'Default' },
+                    { code: 'hi' as const, label: 'हिन्दी', native: 'HI', desc: 'हिंदी' },
+                    { code: 'bn' as const, label: 'বাংলা', native: 'BN', desc: 'বাংলা' }
+                  ].map((item) => {
+                    const isSelected = language === item.code;
+                    return (
+                      <button
+                        key={item.code}
+                        type="button"
+                        onClick={() => {
+                          setLanguage(item.code);
+                          setLangDropdownOpen(false);
+                        }}
+                        className={`flex w-full items-center justify-between rounded-xl px-2.5 sm:px-3 py-2 text-xs font-bold transition-all ${
+                          isSelected
+                            ? 'bg-green-600 text-white shadow-md shadow-green-600/30'
+                            : 'text-slate-200 hover:bg-slate-800 hover:text-white'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="font-extrabold">{item.label}</span>
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded font-mono ${isSelected ? 'bg-white/20 text-white' : 'bg-slate-800 text-slate-400'}`}>
+                            {item.native}
+                          </span>
+                        </div>
+                        {isSelected && (
+                          <Check className="h-4 w-4 shrink-0 text-white stroke-[2.5]" />
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
-            <button 
+            <button
               onClick={() => selectRoleAndNavigate('farmer')}
               className="hidden sm:flex items-center gap-2 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white text-xs font-bold px-4 py-2 rounded-xl shadow-lg shadow-green-600/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
             >
@@ -327,7 +400,7 @@ export default function Home() {
 
       {/* Hero Section */}
       <section className="relative z-10 pt-8 pb-16 px-4 max-w-7xl mx-auto w-full flex flex-col items-center text-center">
-        
+
         {/* Top Announcement Pill */}
         <div className="inline-flex items-center gap-2 rounded-full bg-green-950/70 px-4 py-1.5 text-xs font-semibold text-green-400 border border-green-500/30 mb-8 shadow-inner backdrop-blur-md animate-pulse">
           <Sparkles className="h-3.5 w-3.5 text-green-400" />
@@ -397,14 +470,14 @@ export default function Home() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl mx-auto">
-          
+
           {/* Farmer Portal Card */}
-          <div 
+          <div
             onClick={() => selectRoleAndNavigate('farmer')}
             className="group cursor-pointer glass-card p-8 flex flex-col justify-between border border-slate-800/80 hover:border-green-500/50 transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl hover:shadow-green-500/10 relative overflow-hidden"
           >
             <div className="absolute top-0 right-0 w-32 h-32 bg-green-500/10 rounded-full blur-2xl group-hover:bg-green-500/20 transition-all pointer-events-none" />
-            
+
             <div>
               <div className="flex items-center justify-between mb-6">
                 <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-green-500/20 to-emerald-900/30 border border-green-500/30 flex items-center justify-center text-green-400 group-hover:scale-110 transition-transform">
@@ -418,7 +491,7 @@ export default function Home() {
               <h3 className="text-2xl font-black text-white mb-3 group-hover:text-green-400 transition-colors">
                 {t('farmerPortal')}
               </h3>
-              
+
               <p className="text-slate-300 text-sm leading-relaxed mb-6">
                 {t('roleFarmerDesc')}
               </p>
@@ -455,12 +528,12 @@ export default function Home() {
           </div>
 
           {/* Agriculture Officer Portal Card */}
-          <div 
+          <div
             onClick={() => selectRoleAndNavigate('officer')}
             className="group cursor-pointer glass-card p-8 flex flex-col justify-between border border-slate-800/80 hover:border-emerald-500/50 transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl hover:shadow-emerald-500/10 relative overflow-hidden"
           >
             <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 rounded-full blur-2xl group-hover:bg-emerald-500/20 transition-all pointer-events-none" />
-            
+
             <div>
               <div className="flex items-center justify-between mb-6">
                 <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-emerald-500/20 to-teal-900/30 border border-emerald-500/30 flex items-center justify-center text-emerald-400 group-hover:scale-110 transition-transform">
@@ -474,7 +547,7 @@ export default function Home() {
               <h3 className="text-2xl font-black text-white mb-3 group-hover:text-emerald-400 transition-colors">
                 {t('officerPortal')}
               </h3>
-              
+
               <p className="text-slate-300 text-sm leading-relaxed mb-6">
                 {t('roleOfficerDesc')}
               </p>
@@ -532,11 +605,10 @@ export default function Home() {
               <button
                 key={cat}
                 onClick={() => setActiveCategory(cat)}
-                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                  activeCategory === cat
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${activeCategory === cat
                     ? 'bg-green-600 text-white shadow-lg shadow-green-600/30'
                     : 'bg-slate-900/80 text-slate-400 border border-slate-800 hover:text-slate-200 hover:bg-slate-800'
-                }`}
+                  }`}
               >
                 {cat}
               </button>
@@ -626,7 +698,7 @@ export default function Home() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 relative">
-          
+
           {/* Step 1 */}
           <div className="glass-card p-6 border border-slate-800 flex flex-col justify-between relative group hover:border-green-500/40 transition-all">
             <div className="absolute -top-4 left-6 h-8 w-8 rounded-full bg-green-600 text-white font-black text-xs flex items-center justify-center ring-4 ring-slate-950 shadow-lg">
@@ -697,7 +769,7 @@ export default function Home() {
       {/* Section 4: Performance & Platform Stats */}
       <section id="stats" className="relative z-10 py-16 px-4 max-w-7xl mx-auto w-full border-t border-slate-900">
         <div className="glass-card p-8 sm:p-12 border border-slate-800 bg-gradient-to-b from-slate-900/60 to-slate-950">
-          
+
           <div className="text-center max-w-2xl mx-auto mb-10">
             <h2 className="text-2xl sm:text-4xl font-extrabold text-white tracking-tight mb-2">
               {t('statsHeading')}
@@ -708,7 +780,7 @@ export default function Home() {
           </div>
 
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 text-center">
-            
+
             <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800">
               <div className="text-3xl sm:text-5xl font-black text-gradient-green mb-1">98.4%</div>
               <div className="text-xs font-bold text-slate-300">Classifier Accuracy</div>
@@ -742,7 +814,7 @@ export default function Home() {
       {selectedFeature && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fadeIn">
           <div className="glass-card max-w-2xl w-full p-6 sm:p-8 border border-slate-700 shadow-2xl relative max-h-[90vh] overflow-y-auto">
-            
+
             {/* Close Button */}
             <button
               onClick={() => setSelectedFeature(null)}
