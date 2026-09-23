@@ -2,6 +2,7 @@
 
 # dependencies
 /node_modules
+data
 /.pnp
 .pnp.*
 .yarn/*
@@ -9,7 +10,7 @@
 !.yarn/plugins
 !.yarn/releases
 !.yarn/versions
-
+training_output
 # testing
 /coverage
 
@@ -39,3 +40,4 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+video_presentation_script.md
